@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layout/MainLayout';
 import Dashboard from './pages/Dashboard';
+import { OrderProvider } from './context/OrderContext';
+import Orders from './pages/Orders';
 import { ExpenseProvider } from './context/ExpenseContext';
 import Finances from './pages/Finances';
 
