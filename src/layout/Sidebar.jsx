@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, PieChart, Wallet } from 'lucide-react';
+import { ShoppingCart, PieChart, Wallet } from 'lucide-react';
 
 const Sidebar = () => {
   return (

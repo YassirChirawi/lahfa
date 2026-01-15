@@ -65,16 +65,22 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.slice(0, 5).map(order => (
-                                <tr key={order.id}>
-                                    <td className="font-medium">{order.customer}</td>
-                                    <td>{order.article}</td>
-                                    <td>{order.amount ? order.amount.toFixed(2) : '0.00'} DH</td>
-                                    <td>
-                                        <span className={`status-badge`}>{order.status}</span>
-                                    </td>
-                                </tr>
-                            ))}
+                            {orders.slice(0, 5).map(order => {
+                                const items = order.items || [{ article: order.article }];
+                                const displayArticle = items[0]?.article || '-';
+                                const moreCount = items.length > 1 ? ` (+${items.length - 1})` : '';
+
+                                return (
+                                    <tr key={order.id}>
+                                        <td className="font-medium">{order.customer}</td>
+                                        <td>{displayArticle}{moreCount}</td>
+                                        <td>{order.amount ? order.amount.toFixed(2) : '0.00'} DH</td>
+                                        <td>
+                                            <span className={`status-badge`}>{order.status}</span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

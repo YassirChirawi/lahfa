@@ -84,44 +84,73 @@ const Orders = () => {
                     </thead>
                     <tbody>
                         {filteredOrders.length > 0 ? (
-                            filteredOrders.map(order => (
-                                <tr key={order.id}>
-                                    <td className="font-medium">{order.displayId || order.id}</td>
-                                    <td>{order.date}</td>
-                                    <td>{order.customer}</td>
-                                    <td>{order.phone}</td>
-                                    <td>{order.address}</td>
-                                    <td>{order.article}</td>
-                                    <td>{order.size}</td>
-                                    <td>{order.color}</td>
-                                    <td>{order.quantity}</td>
-                                    <td>{order.amount ? `${order.amount.toFixed(2)} DH` : '-'}</td>
-                                    <td>
-                                        <span className={`status-badge ${getStatusColor(order.status)}`}>
-                                            {order.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="actions-cell">
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                                                className="status-select"
-                                            >
-                                                <option value="Packing">Packing</option>
-                                                <option value="Ramassage">Ramassage</option>
-                                                <option value="Livraison">Livraison</option>
-                                                <option value="Livré">Livré</option>
-                                                <option value="Pas de réponse client">Pas de réponse</option>
-                                                <option value="Retour">Retour</option>
-                                            </select>
-                                            <button className="icon-btn-sm" onClick={() => deleteOrder(order.id)} title="Supprimer">
-                                                &times;
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                            filteredOrders.map(order => {
+                                // Backward compatibility helper
+                                const items = order.items || [{
+                                    article: order.article,
+                                    size: order.size,
+                                    color: order.color,
+                                    quantity: order.quantity
+                                }];
+
+                                return (
+                                    <tr key={order.id} style={{ verticalAlign: 'top' }}>
+                                        <td className="font-medium">{order.displayId || order.id}</td>
+                                        <td>{order.date}</td>
+                                        <td>{order.customer}</td>
+                                        <td>{order.phone}</td>
+                                        <td>{order.address}</td>
+
+                                        {/* Multi-item Columns */}
+                                        <td>
+                                            {items.map((item, i) => (
+                                                <div key={i} style={{ marginBottom: '4px' }}>{item.article || '-'}</div>
+                                            ))}
+                                        </td>
+                                        <td>
+                                            {items.map((item, i) => (
+                                                <div key={i} style={{ marginBottom: '4px' }}>{item.size || '-'}</div>
+                                            ))}
+                                        </td>
+                                        <td>
+                                            {items.map((item, i) => (
+                                                <div key={i} style={{ marginBottom: '4px' }}>{item.color || '-'}</div>
+                                            ))}
+                                        </td>
+                                        <td>
+                                            {items.map((item, i) => (
+                                                <div key={i} style={{ marginBottom: '4px' }}>{item.quantity || 1}</div>
+                                            ))}
+                                        </td>
+
+                                        <td>{order.amount ? `${order.amount.toFixed(2)} DH` : '-'}</td>
+                                        <td>
+                                            <span className={`status-badge ${getStatusColor(order.status)}`}>
+                                                {order.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className="actions-cell">
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                    className="status-select"
+                                                >
+                                                    <option value="Packing">Packing</option>
+                                                    <option value="Ramassage">Ramassage</option>
+                                                    <option value="Livraison">Livraison</option>
+                                                    <option value="Livré">Livré</option>
+                                                    <option value="Pas de réponse client">Pas de réponse</option>
+                                                    <option value="Retour">Retour</option>
+                                                </select>
+                                                <button className="icon-btn-sm" onClick={() => deleteOrder(order.id)} title="Supprimer">
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         ) : (
                             <tr>
                                 <td colSpan="12" className="text-center p-6">Aucune commande trouvée.</td>
