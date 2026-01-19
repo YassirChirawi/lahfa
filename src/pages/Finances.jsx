@@ -37,9 +37,18 @@ const Finances = () => {
     });
 
     const revenueThisMonth = ordersThisMonth
-        .reduce((sum, o) => sum + (o.status === 'Livré' ? (parseFloat(o.amount) || 0) : 0), 0);
+        .reduce((sum, o) => {
+            if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+            if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
+            return sum;
+        }, 0);
 
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.status === 'Livré' ? (parseFloat(o.amount) || 0) : 0), 0);
+    const totalRevenue = orders.reduce((sum, o) => {
+        if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+        if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
+        return sum;
+    }, 0);
+
     const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
     const netProfit = totalRevenue - totalExpenses;
 
@@ -58,8 +67,12 @@ const Finances = () => {
             const dayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
             const dailyRevenue = orders
-                .filter(o => o.date === dateStr && o.status === 'Livré')
-                .reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
+                .filter(o => o.date === dateStr)
+                .reduce((sum, o) => {
+                    if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+                    if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
+                    return sum;
+                }, 0);
 
             data.push({ name: dayLabel, revenue: dailyRevenue });
         }
