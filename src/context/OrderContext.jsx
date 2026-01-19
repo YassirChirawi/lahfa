@@ -82,9 +82,35 @@ export const OrderProvider = ({ children }) => {
 
     const deleteOrder = async (id) => {
         try {
-            await deleteDoc(doc(db, 'orders', id));
+            // Soft delete: just mark as deleted
+            const orderRef = doc(db, 'orders', id);
+            await updateDoc(orderRef, {
+                deleted: true,
+                deletedAt: new Date().toISOString()
+            });
         } catch (e) {
             console.error("Error deleting document: ", e);
+        }
+    };
+
+    const restoreOrder = async (id) => {
+        try {
+            const orderRef = doc(db, 'orders', id);
+            await updateDoc(orderRef, {
+                deleted: false,
+                deletedAt: null
+            });
+        } catch (e) {
+            console.error("Error restoring document: ", e);
+        }
+    };
+
+    // Hard delete for permanent cleanup if needed (optional, maybe distinct name)
+    const permanentDeleteOrder = async (id) => {
+        try {
+            await deleteDoc(doc(db, 'orders', id));
+        } catch (e) {
+            console.error("Error permanently deleting document: ", e);
         }
     };
 
@@ -94,7 +120,9 @@ export const OrderProvider = ({ children }) => {
         addOrder,
         updateOrderStatus,
         updateOrder,
-        deleteOrder
+        deleteOrder,
+        restoreOrder,
+        permanentDeleteOrder
     };
 
     return (
