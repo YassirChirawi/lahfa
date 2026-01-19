@@ -6,10 +6,11 @@ import '../styles/orders.css';
 import '../styles/modal.css';
 
 const Orders = () => {
-    const { orders, addOrder, updateOrderStatus, deleteOrder } = useOrders();
+    const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder } = useOrders();
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingOrder, setEditingOrder] = useState(null);
 
     const filteredOrders = orders.filter(order => {
         const matchesFilter = filter === 'All' || order.status === filter;
@@ -32,11 +33,26 @@ const Orders = () => {
         }
     };
 
+    const handleSaveOrder = async (orderData) => {
+        if (editingOrder) {
+            await updateOrder(editingOrder.id, orderData);
+        } else {
+            await addOrder(orderData);
+        }
+        setIsModalOpen(false);
+        setEditingOrder(null);
+    };
+
+    const openEditModal = (order) => {
+        setEditingOrder(order);
+        setIsModalOpen(true);
+    };
+
     return (
         <div className="orders-page">
             <div className="page-header">
                 <h1>Orders</h1>
-                <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+                <button className="btn-primary" onClick={() => { setEditingOrder(null); setIsModalOpen(true); }}>
                     <Plus size={18} />
                     Create Order
                 </button>
@@ -72,6 +88,7 @@ const Orders = () => {
                             <th>Date</th>
                             <th>Client</th>
                             <th>Téléphone</th>
+                            <th>Ville</th>
                             <th>Adresse</th>
                             <th>Article</th>
                             <th>Taille</th>
@@ -99,6 +116,7 @@ const Orders = () => {
                                         <td>{order.date}</td>
                                         <td>{order.customer}</td>
                                         <td>{order.phone}</td>
+                                        <td>{order.city || '-'}</td>
                                         <td>{order.address}</td>
 
                                         {/* Multi-item Columns */}
@@ -143,6 +161,9 @@ const Orders = () => {
                                                     <option value="Pas de réponse client">Pas de réponse</option>
                                                     <option value="Retour">Retour</option>
                                                 </select>
+                                                <button className="icon-btn-sm" onClick={() => openEditModal(order)} title="Modifier">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                                </button>
                                                 <button className="icon-btn-sm" onClick={() => deleteOrder(order.id)} title="Supprimer">
                                                     &times;
                                                 </button>
@@ -162,8 +183,9 @@ const Orders = () => {
 
             <CreateOrderModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={addOrder}
+                onClose={() => { setIsModalOpen(false); setEditingOrder(null); }}
+                onSave={handleSaveOrder}
+                initialData={editingOrder}
             />
         </div>
     );

@@ -9,9 +9,12 @@ export const useOrders = () => useContext(OrderContext);
 // Initial orders removed in favor of Firestore
 
 
+import { useClients } from './ClientContext';
+
 export const OrderProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { syncClientFromOrder } = useClients();
 
     useEffect(() => {
         // Subscribe to real-time updates
@@ -43,6 +46,9 @@ export const OrderProvider = ({ children }) => {
                 status: order.status || 'Packing'
             };
             await addDoc(collection(db, 'orders'), newOrder);
+
+            // Sync with Client Context
+            await syncClientFromOrder(newOrder);
         } catch (e) {
             console.error("Error adding document: ", e);
         }
@@ -59,6 +65,21 @@ export const OrderProvider = ({ children }) => {
         }
     };
 
+    const updateOrder = async (id, updatedData) => {
+        try {
+            const orderRef = doc(db, 'orders', id);
+            await updateDoc(orderRef, updatedData);
+
+            // Sync with Client Context to ensure stats/details are up to date
+            // We pass the merged data (we might need to fetch it first or just pass updatedData if it has enough info)
+            // Ideally we should pass the full order object.
+            // For now let's pass updatedData assuming it has phone/customer/amount.
+            await syncClientFromOrder({ ...updatedData, date: updatedData.date || new Date().toISOString().split('T')[0] });
+        } catch (e) {
+            console.error("Error updating order: ", e);
+        }
+    };
+
     const deleteOrder = async (id) => {
         try {
             await deleteDoc(doc(db, 'orders', id));
@@ -72,6 +93,7 @@ export const OrderProvider = ({ children }) => {
         loading,
         addOrder,
         updateOrderStatus,
+        updateOrder,
         deleteOrder
     };
 

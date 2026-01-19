@@ -1,8 +1,9 @@
 :root {
   /* HSL Color Palette - LAHFA Intimate Theme */
-  --primary: 0 59% 41%; /* #A62B2B - Deep Rust/Red */
+  --primary: 0 59% 41%;
+  /* #A62B2B - Deep Rust/Red */
   --primary-foreground: 0 0% 100%;
-  
+
   --background: 220 25% 97%;
   --foreground: 222 47% 11%;
 
@@ -14,9 +15,9 @@
 
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  
+
   --radius: 0.75rem;
-  
+
   --success: 142 76% 36%;
   --warning: 38 92% 50%;
   --destructive: 0 84% 60%;
@@ -46,7 +47,12 @@ a {
   color: inherit;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 600;
   letter-spacing: -0.025em;
 }
@@ -60,19 +66,133 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Utilities */
-.flex { display: flex; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-.gap-4 { gap: 1rem; }
-.p-4 { padding: 1rem; }
-.p-6 { padding: 1.5rem; }
-.rounded-lg { border-radius: var(--radius); }
-.shadow-sm { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.p-6 {
+  padding: 1.5rem;
+}
+
+.rounded-lg {
+  border-radius: var(--radius);
+}
+
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
 
 .card {
   background-color: hsl(var(--card));
   color: hsl(var(--card-foreground));
   border-radius: var(--radius);
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -1px rgb(0 0 0 / 0.05);
+}
+
+.page-header h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.025em;
+}
+
+.page-header p {
+  color: #6B7280;
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+}
+
+/* Custom Table Styles for Premium Look */
+.orders-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.orders-table th {
+  background-color: #F9FAFB;
+  color: #6B7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.orders-table td {
+  padding: 1rem 1.5rem;
+  color: #1F2937;
+  border-bottom: 1px solid #F3F4F6;
+  font-size: 0.875rem;
+}
+
+.orders-table tr:last-child td {
+  border-bottom: none;
+}
+
+.orders-table tr:hover td {
+  background-color: #F9FAFB;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-success {
+  background-color: #ECFDF5;
+  color: #059669;
+}
+
+.status-warning {
+  background-color: #FFFBEB;
+  color: #D97706;
+}
+
+.status-info {
+  background-color: #EFF6FF;
+  color: #3B82F6;
+}
+
+.status-primary {
+  background-color: #EEF2FF;
+  color: #4F46E5;
+}
+
+.status-danger {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.status-default {
+  background-color: #F3F4F6;
+  color: #4B5563;
 }

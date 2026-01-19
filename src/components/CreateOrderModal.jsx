@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useClients } from '../context/ClientContext';
 
-const CreateOrderModal = ({ isOpen, onClose, onSave }) => {
-    const [formData, setFormData] = useState({
+const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
+    // Default initial state
+    const defaultState = {
         customer: '',
         phone: '',
+        city: '',
         address: '',
         article: '',
         size: '',
@@ -12,7 +15,35 @@ const CreateOrderModal = ({ isOpen, onClose, onSave }) => {
         quantity: 1,
         amount: '',
         status: 'Packing'
-    });
+    };
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const { clients } = useClients();
+
+    const [formData, setFormData] = useState(defaultState);
+
+    // Effect to populate form when initialData changes or modal opens
+    React.useEffect(() => {
+        if (isOpen && initialData) {
+            setFormData({
+                customer: initialData.customer || '',
+                phone: initialData.phone || '',
+                city: initialData.city || '',
+                address: initialData.address || '',
+                article: initialData.article || (initialData.items && initialData.items[0]?.article) || '',
+                size: initialData.size || (initialData.items && initialData.items[0]?.size) || '',
+                color: initialData.color || (initialData.items && initialData.items[0]?.color) || '',
+                quantity: initialData.quantity || (initialData.items && initialData.items[0]?.quantity) || 1,
+                amount: initialData.amount || '',
+                status: initialData.status || 'Packing',
+                // Keep ID if needed for update logic outside
+                id: initialData.id
+            });
+        } else if (isOpen && !initialData) {
+            setFormData(defaultState);
+        }
+    }, [isOpen, initialData]);
 
     if (!isOpen) return null;
 
@@ -28,29 +59,65 @@ const CreateOrderModal = ({ isOpen, onClose, onSave }) => {
         e.preventDefault();
         onSave(formData);
         onClose();
-        setFormData({
-            customer: '',
-            phone: '',
-            address: '',
-            article: '',
-            size: '',
-            color: '',
-            quantity: 1,
-            amount: '',
-            status: 'Packing'
-        });
+        // Reset handled by useEffect on next open
+    };
+
+    const filteredClients = clients ? clients.filter(client =>
+        (client.name && client.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (client.phone && client.phone.includes(searchTerm))
+    ) : [];
+
+    const handleClientSelect = (client) => {
+        setFormData(prev => ({
+            ...prev,
+            customer: client.name,
+            phone: client.phone,
+            city: client.city || prev.city,
+            address: client.address || prev.address
+        }));
+        setSearchTerm('');
+        setShowSuggestions(false);
     };
 
     return (
         <div className="modal-overlay">
             <div className="modal-content card">
                 <div className="modal-header">
-                    <h3>Create New Order</h3>
+                    <h3>{initialData ? 'Modifier la Commande' : 'Create New Order'}</h3>
                     <button onClick={onClose} className="icon-btn">
                         <X size={20} />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="modal-form">
+                    {/* Client Search/Select */}
+                    <div className="form-group relative">
+                        <label>Rechercher un Client existant</label>
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setShowSuggestions(true);
+                            }}
+                            placeholder="Rechercher par nom ou téléphone..."
+                            className="bg-gray-50 mb-2"
+                        />
+                        {showSuggestions && searchTerm && (
+                            <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto top-full">
+                                {filteredClients.map(client => (
+                                    <div
+                                        key={client.id}
+                                        className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+                                        onClick={() => handleClientSelect(client)}
+                                    >
+                                        <div className="font-medium">{client.name}</div>
+                                        <div className="text-sm text-gray-500">{client.phone}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="form-row">
                         <div className="form-group">
                             <label>Nom du Client</label>
@@ -76,16 +143,29 @@ const CreateOrderModal = ({ isOpen, onClose, onSave }) => {
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Adresse</label>
-                        <input
-                            type="text"
-                            name="address"
-                            required
-                            value={formData.address}
-                            onChange={handleChange}
-                            placeholder="Adresse complète"
-                        />
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>Ville</label>
+                            <input
+                                type="text"
+                                name="city"
+                                required
+                                value={formData.city}
+                                onChange={handleChange}
+                                placeholder="Ville"
+                            />
+                        </div>
+                        <div className="form-group" style={{ flex: 2 }}>
+                            <label>Adresse</label>
+                            <input
+                                type="text"
+                                name="address"
+                                required
+                                value={formData.address}
+                                onChange={handleChange}
+                                placeholder="Adresse complète"
+                            />
+                        </div>
                     </div>
 
                     <div className="form-row">
@@ -164,7 +244,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave }) => {
 
                     <div className="modal-actions">
                         <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
-                        <button type="submit" className="btn-primary">Créer Commande</button>
+                        <button type="submit" className="btn-primary">{initialData ? 'Mettre à jour' : 'Créer Commande'}</button>
                     </div>
                 </form>
             </div>
