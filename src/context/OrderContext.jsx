@@ -10,11 +10,13 @@ export const useOrders = () => useContext(OrderContext);
 
 
 import { useClients } from './ClientContext';
+import { useProducts } from './ProductContext';
 
 export const OrderProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const { syncClientFromOrder } = useClients();
+    const { decrementStock } = useProducts();
 
     useEffect(() => {
         // Subscribe to real-time updates
@@ -49,6 +51,11 @@ export const OrderProvider = ({ children }) => {
 
             // Sync with Client Context
             await syncClientFromOrder(newOrder);
+
+            // Decrement Stock if Product ID exists
+            if (newOrder.productId) {
+                await decrementStock(newOrder.productId, newOrder.quantity || 1);
+            }
         } catch (e) {
             console.error("Error adding document: ", e);
         }

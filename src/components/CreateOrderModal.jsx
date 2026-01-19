@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useClients } from '../context/ClientContext';
+import { useProducts } from '../context/ProductContext';
 
 const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
     // Default initial state
@@ -20,6 +21,11 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const { clients } = useClients();
+
+    // Product Search State
+    const { products } = useProducts();
+    const [productSearch, setProductSearch] = useState('');
+    const [showProductSuggestions, setShowProductSuggestions] = useState(false);
 
     const [formData, setFormData] = useState(defaultState);
 
@@ -77,6 +83,23 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         }));
         setSearchTerm('');
         setShowSuggestions(false);
+    };
+
+    const filteredProducts = products ? products.filter(p =>
+        p.name.toLowerCase().includes(productSearch.toLowerCase())
+    ) : [];
+
+    const handleProductSelect = (product) => {
+        setFormData(prev => ({
+            ...prev,
+            article: product.name,
+            size: product.size || prev.size,
+            color: product.color || prev.color,
+            amount: product.price || prev.amount,
+            productId: product.id // Store reference
+        }));
+        setProductSearch('');
+        setShowProductSuggestions(false);
     };
 
     return (
@@ -169,16 +192,66 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                     </div>
 
                     <div className="form-row">
-                        <div className="form-group" style={{ flex: 2 }}>
+                        <div className="form-group relative" style={{ flex: 2 }}>
+                            <label>Article (Rechercher Produit)</label>
+                            <input
+                                type="text"
+                                value={productSearch}
+                                onChange={(e) => {
+                                    setProductSearch(e.target.value);
+                                    setShowProductSuggestions(true);
+                                    // Ensure we update the article field manually if typing new
+                                    setFormData(prev => ({ ...prev, article: e.target.value }));
+                                }}
+                                onFocus={() => setShowProductSuggestions(true)}
+                            // We display either the selected article or what is being typed. 
+                            // Actually better design: Input is the article name. Search is overlay or typing triggers it.
+                            // Let's try: Input binds to formData.article, but handler searches products.
+                            // REVISION: Use a dedicated search box logic similar to Client, or just make the Article input a search box.
+                            // Let's use the 'Search' approach: A typeahead.
+                            />
+                            {/* Hidden actual input sync? No, we just use the search input as the article name if no select. */}
+                            {/* But wait, formData.article needs to be set. */}
+                        </div>
+                        {/* Redoing the block above to be cleaner implementation */}
+                        <div className="form-group relative">
                             <label>Article</label>
                             <input
                                 type="text"
                                 name="article"
                                 required
                                 value={formData.article}
-                                onChange={handleChange}
                                 placeholder="Nom de l'article"
+                                autoComplete="off"
+                                onChange={(e) => {
+                                    handleChange(e);
+                                    setProductSearch(e.target.value);
+                                    setShowProductSuggestions(true);
+                                }}
                             />
+                            {showProductSuggestions && productSearch && (
+                                <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto top-full">
+                                    {filteredProducts.length > 0 ? (
+                                        filteredProducts.map(product => (
+                                            <div
+                                                key={product.id}
+                                                className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 flex justify-between items-center"
+                                                onClick={() => handleProductSelect(product)}
+                                            >
+                                                <div>
+                                                    <div className="font-medium">{product.name}</div>
+                                                    <div className="text-xs text-gray-500">{product.size} - {product.color}</div>
+                                                </div>
+                                                <div className="text-sm font-bold text-indigo-600">
+                                                    {product.price} DH (Stock: {product.stock})
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-3 text-gray-400 text-sm">No products found</div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="form-group">
                             <label>Taille</label>
