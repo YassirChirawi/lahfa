@@ -7,8 +7,15 @@ const Dashboard = () => {
     const { orders } = useOrders();
 
     // Calculate Metrics
-    // Revenue is only sum of "Livré" orders
-    const totalRevenue = orders.reduce((sum, order) => sum + (order.status === 'Livré' ? order.amount : 0), 0);
+    // Calculate Metrics
+    // Revenue: Livré (+) - Retour (-) 
+    // Note: This logic duplicates Finances.jsx. Ideally move to Context.
+    const totalRevenue = orders.reduce((sum, order) => {
+        if (order.status === 'Livré') return sum + (parseFloat(order.amount) || 0);
+        if (order.status === 'Retour') return sum - (parseFloat(order.amount) || 0);
+        return sum;
+    }, 0);
+
     const totalOrders = orders.length;
     // Active orders: everything not delivered, returned or cancelled (simplification)
     const activeOrders = orders.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
@@ -23,7 +30,7 @@ const Dashboard = () => {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <KPICard
-                    title="Chiffre d'Affaires (Livré)"
+                    title="Chiffre d'Affaires (Net)"
                     value={`${totalRevenue.toFixed(2)} DH`}
                     change="-"
                     trend="up"
@@ -37,7 +44,7 @@ const Dashboard = () => {
                     icon={ShoppingBag}
                 />
                 <KPICard
-                    title="Panier Moyen (Livré)"
+                    title="Panier Moyen"
                     value={`${averageOrderValue.toFixed(2)} DH`}
                     change="-"
                     trend="down"
@@ -53,11 +60,12 @@ const Dashboard = () => {
             </div>
 
             <div className="card p-6">
-                <h3 className="font-bold mb-4" style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Commandes Récentes</h3>
+                <h3 className="font-bold mb-4" style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Toutes les Commandes</h3>
                 <div className="orders-table-container">
                     <table className="orders-table">
                         <thead>
                             <tr>
+                                <th>Date</th>
                                 <th>Client</th>
                                 <th>Article</th>
                                 <th>Montant</th>
@@ -65,18 +73,19 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.slice(0, 5).map(order => {
+                            {orders.map(order => {
                                 const items = order.items || [{ article: order.article }];
                                 const displayArticle = items[0]?.article || '-';
                                 const moreCount = items.length > 1 ? ` (+${items.length - 1})` : '';
 
                                 return (
                                     <tr key={order.id}>
+                                        <td className="text-gray-500">{order.date || '-'}</td>
                                         <td className="font-medium">{order.customer}</td>
                                         <td>{displayArticle}{moreCount}</td>
                                         <td>{order.amount ? order.amount.toFixed(2) : '0.00'} DH</td>
                                         <td>
-                                            <span className={`status-badge`}>{order.status}</span>
+                                            <span className={`status-badge ${order.status === 'Livré' ? 'status-success' : order.status === 'Retour' ? 'status-danger' : 'status-warning'}`}>{order.status}</span>
                                         </td>
                                     </tr>
                                 );
