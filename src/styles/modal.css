@@ -61,6 +61,7 @@
 
 .form-group input,
 .form-group select {
+    width: 100%;
     padding: 0.6rem;
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);

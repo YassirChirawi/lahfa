@@ -214,7 +214,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                             {/* But wait, formData.article needs to be set. */}
                         </div>
                         {/* Redoing the block above to be cleaner implementation */}
-                        <div className="form-group relative">
+                        <div className="form-group relative" style={{ flex: 3 }}>
                             <label>Article</label>
                             <input
                                 type="text"
