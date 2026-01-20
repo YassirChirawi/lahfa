@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { useProducts } from '../context/ProductContext';
-import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Package, Upload, Loader2 } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 
 const Products = () => {
     const { products, addProduct, updateProduct, deleteProduct, loading } = useProducts();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [uploading, setUploading] = useState(false);
+
     const [formData, setFormData] = useState({
         name: '',
         price: '',
@@ -15,6 +19,8 @@ const Products = () => {
         size: '',
         color: ''
     });
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState('');
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -24,24 +30,49 @@ const Products = () => {
         if (product) {
             setEditingProduct(product);
             setFormData(product);
+            setImagePreview(product.image || '');
         } else {
             setEditingProduct(null);
             setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '' });
+            setImagePreview('');
         }
+        setImageFile(null);
         setIsModalOpen(true);
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setUploading(true);
         try {
+            let imageUrl = formData.image;
+
+            if (imageFile) {
+                const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+                const snapshot = await uploadBytes(storageRef, imageFile);
+                imageUrl = await getDownloadURL(snapshot.ref);
+            }
+
+            const productData = { ...formData, image: imageUrl };
+
             if (editingProduct) {
-                await updateProduct(editingProduct.id, formData);
+                await updateProduct(editingProduct.id, productData);
             } else {
-                await addProduct(formData);
+                await addProduct(productData);
             }
             setIsModalOpen(false);
         } catch (error) {
+            console.error("Error saving product:", error);
             alert('Error saving product');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -121,9 +152,27 @@ const Products = () => {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4">{editingProduct ? 'Edit Product' : 'New Product'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Image Upload */}
+                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-indigo-500 transition relative bg-gray-50">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                />
+                                {imagePreview ? (
+                                    <img src={imagePreview} alt="Preview" className="h-32 w-full object-contain rounded-lg" />
+                                ) : (
+                                    <div className="text-center text-gray-400">
+                                        <Upload className="mx-auto mb-2" size={32} />
+                                        <p className="text-sm">Click to upload image</p>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                                 <input required type="text" className="w-full p-2 border rounded-lg" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
@@ -148,14 +197,17 @@ const Products = () => {
                                     <input type="text" placeholder="e.g. Blue" className="w-full p-2 border rounded-lg" value={formData.color} onChange={e => setFormData({ ...formData, color: e.target.value })} />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
-                                <input type="text" placeholder="https://..." className="w-full p-2 border rounded-lg" value={formData.image} onChange={e => setFormData({ ...formData, image: e.target.value })} />
-                            </div>
 
                             <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save Product</button>
+                                <button
+                                    type="submit"
+                                    disabled={uploading}
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                                >
+                                    {uploading && <Loader2 size={16} className="animate-spin" />}
+                                    {uploading ? 'Uploading...' : 'Save Product'}
+                                </button>
                             </div>
                         </form>
                     </div>
