@@ -12,7 +12,6 @@ const Dashboard = () => {
     // Note: This logic duplicates Finances.jsx. Ideally move to Context.
     const totalRevenue = orders.reduce((sum, order) => {
         if (order.status === 'Livré') return sum + (parseFloat(order.amount) || 0);
-        if (order.status === 'Retour') return sum - (parseFloat(order.amount) || 0);
         return sum;
     }, 0);
 

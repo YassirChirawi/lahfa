@@ -39,13 +39,11 @@ const Finances = () => {
     const revenueThisMonth = ordersThisMonth
         .reduce((sum, o) => {
             if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
-            if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
             return sum;
         }, 0);
 
     const totalRevenue = orders.reduce((sum, o) => {
         if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
-        if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
         return sum;
     }, 0);
 
@@ -70,7 +68,6 @@ const Finances = () => {
                 .filter(o => o.date === dateStr)
                 .reduce((sum, o) => {
                     if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
-                    if (o.status === 'Retour') return sum - (parseFloat(o.amount) || 0);
                     return sum;
                 }, 0);
 
