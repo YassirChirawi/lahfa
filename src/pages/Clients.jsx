@@ -1,12 +1,43 @@
 import React, { useState, useMemo } from 'react';
 import { useClients } from '../context/ClientContext';
-import { Search, MapPin, Users, TrendingUp, Eye, UserPlus } from 'lucide-react';
+import { useOrders } from '../context/OrderContext';
+import { Search, MapPin, Users, TrendingUp, Eye, UserPlus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import CustomerDetailModal from '../components/CustomerDetailModal';
+import EditClientModal from '../components/EditClientModal';
 
 export default function Clients() {
-    const { clients, loading, addClient } = useClients();
+    const { clients, loading, addClient, updateClient, deleteClient } = useClients();
+    const { orders } = useOrders();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [editingClient, setEditingClient] = useState(null);
+
+    const customersWithStats = useMemo(() => {
+        return clients.map(client => {
+            const clientOrders = orders.filter(o => o.phone === client.phone);
+            const stats = {
+                delivered: clientOrders.filter(o => o.status === 'Livré').length,
+                returned: clientOrders.filter(o => o.status === 'Retour').length,
+                cancelled: clientOrders.filter(o => o.status === 'Pas de réponse client' || o.status === 'Annulé').length
+            };
+            return { ...client, stats };
+        });
+    }, [clients, orders]);
+
+    const handleEditClient = (client) => {
+        setEditingClient(client);
+    };
+
+    const handleSaveClient = async (id, data) => {
+        await updateClient(id, data);
+        setEditingClient(null);
+    };
+
+    const handleDeleteClient = async (id) => {
+        if (window.confirm("Are you sure you want to delete this client? This cannot be undone.")) {
+            await deleteClient(id);
+        }
+    };
 
     const kpiStats = useMemo(() => {
         if (!clients.length) return { total: 0, ltv: 0, topCity: 'N/A' };
@@ -31,7 +62,7 @@ export default function Clients() {
         };
     }, [clients]);
 
-    const filteredCustomers = clients.filter(c =>
+    const filteredCustomers = customersWithStats.filter(c =>
         (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.phone || '').includes(searchTerm) ||
         (c.city || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -132,8 +163,15 @@ export default function Clients() {
                         ) : filteredCustomers.length === 0 ? (
                             <tr><td colSpan="7" className="px-6 py-5 text-center text-gray-500">No customers found.</td></tr>
                         ) : filteredCustomers.map((customer) => (
-                            <tr key={customer.id}>
-                                <td className="font-semibold text-gray-900">{customer.name}</td>
+                            <tr key={customer.id} className={customer.stats?.returned > 0 ? 'bg-red-50' : ''}>
+                                <td className="font-semibold text-gray-900 flex items-center gap-2">
+                                    {customer.name}
+                                    {customer.stats?.returned > 0 && (
+                                        <div className="text-red-600" title={`Has ${customer.stats.returned} returned orders`}>
+                                            <AlertTriangle size={16} />
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="text-gray-500">{customer.phone}</td>
                                 <td className="text-gray-500">{customer.city || '-'}</td>
                                 <td className="text-gray-500">{customer.totalOrders || customer.orderCount || 0}</td>
@@ -142,6 +180,20 @@ export default function Clients() {
                                 </td>
                                 <td className="text-gray-500">{customer.lastOrderDate || '-'}</td>
                                 <td className="text-right">
+                                    <button
+                                        onClick={() => handleEditClient(customer)}
+                                        className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-full transition-colors mr-1"
+                                        title="Edit"
+                                    >
+                                        <Edit className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteClient(customer.id)}
+                                        className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-full transition-colors mr-1"
+                                        title="Delete"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
                                     <button
                                         onClick={() => setSelectedCustomer(customer)}
                                         className="text-indigo-600 hover:text-indigo-900 p-2 hover:bg-indigo-50 rounded-full transition-colors"
@@ -160,6 +212,13 @@ export default function Clients() {
                 isOpen={!!selectedCustomer}
                 onClose={() => setSelectedCustomer(null)}
                 customer={selectedCustomer}
+            />
+
+            <EditClientModal
+                isOpen={!!editingClient}
+                onClose={() => setEditingClient(null)}
+                client={editingClient}
+                onSave={handleSaveClient}
             />
         </div>
     );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, User, Phone, MapPin, ShoppingBag, Calendar } from 'lucide-react';
+import { X, User, Phone, MapPin, ShoppingBag, Calendar, AlertTriangle, CheckCircle, XCircle, PackageX } from 'lucide-react';
 
 const CustomerDetailModal = ({ isOpen, onClose, customer }) => {
     if (!isOpen || !customer) return null;
@@ -45,12 +45,23 @@ const CustomerDetailModal = ({ isOpen, onClose, customer }) => {
                         </div>
                     </div>
 
+                    {/* Alert for Returns */}
+                    {customer.stats?.returned > 0 && (
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-4 flex items-center gap-3">
+                            <AlertTriangle className="text-red-600 h-5 w-5" />
+                            <div>
+                                <p className="text-sm font-bold text-red-800">Return Alert</p>
+                                <p className="text-xs text-red-600">This customer has {customer.stats.returned} returned order(s).</p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="border-t border-gray-100 pt-4">
                         <h5 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                             <ShoppingBag size={18} className="text-gray-400" />
                             Overview
                         </h5>
-                        <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="grid grid-cols-3 gap-4 text-center mb-6">
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Total Orders</p>
                                 <p className="text-lg font-bold text-indigo-600">{customer.orderCount || 0}</p>
@@ -62,6 +73,28 @@ const CustomerDetailModal = ({ isOpen, onClose, customer }) => {
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Last Order</p>
                                 <p className="text-sm font-bold text-gray-900">{customer.lastOrderDate || '-'}</p>
+                            </div>
+                        </div>
+
+                        <h5 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <CheckCircle size={18} className="text-gray-400" />
+                            Order Statistics
+                        </h5>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="p-3 bg-green-50 rounded-lg text-center">
+                                <div className="flex justify-center mb-1"><CheckCircle className="h-5 w-5 text-green-600" /></div>
+                                <p className="text-xs text-green-700 font-medium">Delivered</p>
+                                <p className="text-lg font-bold text-green-800">{customer.stats?.delivered || 0}</p>
+                            </div>
+                            <div className="p-3 bg-red-50 rounded-lg text-center">
+                                <div className="flex justify-center mb-1"><PackageX className="h-5 w-5 text-red-600" /></div>
+                                <p className="text-xs text-red-700 font-medium">Returned</p>
+                                <p className="text-lg font-bold text-red-800">{customer.stats?.returned || 0}</p>
+                            </div>
+                            <div className="p-3 bg-orange-50 rounded-lg text-center">
+                                <div className="flex justify-center mb-1"><XCircle className="h-5 w-5 text-orange-600" /></div>
+                                <p className="text-xs text-orange-700 font-medium">No Response</p>
+                                <p className="text-lg font-bold text-orange-800">{customer.stats?.cancelled || 0}</p>
                             </div>
                         </div>
                     </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, doc, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, onSnapshot, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 
 const ClientContext = createContext();
 
@@ -50,6 +50,25 @@ export const ClientProvider = ({ children }) => {
             return docRef.id;
         } catch (e) {
             console.error("Error adding client: ", e);
+            throw e;
+        }
+    };
+
+    const deleteClient = async (clientId) => {
+        try {
+            await deleteDoc(doc(db, 'clients', clientId));
+        } catch (e) {
+            console.error("Error deleting client: ", e);
+            throw e;
+        }
+    };
+
+    const updateClient = async (clientId, data) => {
+        try {
+            const clientRef = doc(db, 'clients', clientId);
+            await updateDoc(clientRef, data);
+        } catch (e) {
+            console.error("Error updating client: ", e);
             throw e;
         }
     };
@@ -121,6 +140,8 @@ export const ClientProvider = ({ children }) => {
         clients,
         loading,
         addClient,
+        deleteClient,
+        updateClient,
         updateClientStats,
         findClientByPhone,
         syncClientFromOrder
