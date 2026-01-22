@@ -6,9 +6,7 @@ const Header = () => {
         <header className="header">
             <h2 className="header-title">Dashboard</h2>
             <div className="header-actions">
-                <button className="icon-btn">
-                    <Bell size={20} />
-                </button>
+                {/* Notification Bell Removed */}
                 <div className="user-profile">
                     <div className="avatar">
                         <img src="/eya-profile.png" alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />

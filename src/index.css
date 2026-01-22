@@ -35,7 +35,7 @@ body {
   color: hsl(var(--foreground));
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='28' font-size='24'>🎀</text></svg>"), auto;
+  cursor: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text y='28' font-size='24'>👙</text></svg>"), auto;
 }
 
 h1::after,
