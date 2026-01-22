@@ -2,9 +2,10 @@ import React from 'react';
 import { useOrders } from '../context/OrderContext';
 import KPICard from '../components/KPICard';
 import { DollarSign, ShoppingBag, TrendingUp, Users } from 'lucide-react';
+import '../styles/orders.css';
 
 const Dashboard = () => {
-    const { orders } = useOrders();
+    const { orders, updateOrderStatus } = useOrders();
 
     // Calculate Metrics
     // Calculate Metrics
@@ -84,7 +85,19 @@ const Dashboard = () => {
                                         <td>{displayArticle}{moreCount}</td>
                                         <td>{order.amount ? order.amount.toFixed(2) : '0.00'} DH</td>
                                         <td>
-                                            <span className={`status-badge ${order.status === 'Livré' ? 'status-success' : order.status === 'Retour' ? 'status-danger' : 'status-warning'}`}>{order.status}</span>
+                                            <select
+                                                value={order.status}
+                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                className="status-select"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <option value="Packing">Packing</option>
+                                                <option value="Ramassage">Ramassage</option>
+                                                <option value="Livraison">Livraison</option>
+                                                <option value="Livré">Livré</option>
+                                                <option value="Pas de réponse client">Pas de réponse</option>
+                                                <option value="Retour">Retour</option>
+                                            </select>
                                         </td>
                                     </tr>
                                 );

@@ -9,6 +9,11 @@ const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
+    const [cityFilter, setCityFilter] = useState('');
+    const [productFilter, setProductFilter] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
+    const [minPrice, setMinPrice] = useState('');
+    const [maxPrice, setMaxPrice] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState(null);
     const [showTrash, setShowTrash] = useState(false); // Toggle for deleted orders
@@ -21,13 +26,25 @@ const Orders = () => {
             if (order.deleted) return false;
         }
 
-        const matchesFilter = filter === 'All' || order.status === filter;
+        const matchesStatus = filter === 'All' || order.status === filter;
         const matchesSearch =
             (order.customer && order.customer.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (order.id && order.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (order.phone && order.phone.includes(searchTerm));
 
-        return matchesFilter && matchesSearch;
+        const matchesCity = cityFilter === '' || (order.city && order.city.toLowerCase().includes(cityFilter.toLowerCase()));
+
+        // Handle items for product filter
+        const items = order.items || [{ article: order.article }];
+        const matchesProduct = productFilter === '' || items.some(item => item.article && item.article.toLowerCase().includes(productFilter.toLowerCase()));
+
+        const matchesDate = dateFilter === '' || (order.date && order.date.includes(dateFilter));
+
+        const price = parseFloat(order.amount) || 0;
+        const matchesMinPrice = minPrice === '' || price >= parseFloat(minPrice);
+        const matchesMaxPrice = maxPrice === '' || price <= parseFloat(maxPrice);
+
+        return matchesStatus && matchesSearch && matchesCity && matchesProduct && matchesDate && matchesMinPrice && matchesMaxPrice;
     });
 
     const getStatusColor = (status) => {
@@ -95,11 +112,71 @@ const Orders = () => {
                     <Filter size={18} />
                     <select value={filter} onChange={(e) => setFilter(e.target.value)}>
                         <option value="All">All Status</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Processing">Processing</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Packing">Packing</option>
+                        <option value="Ramassage">Ramassage</option>
+                        <option value="Livraison">Livraison</option>
+                        <option value="Livré">Livré</option>
+                        <option value="Pas de réponse client">Pas de réponse</option>
+                        <option value="Retour">Retour</option>
                     </select>
+                </div>
+
+                {/* Advanced Filters */}
+                <div className="flex gap-2 flex-wrap items-center">
+                    <input
+                        type="text"
+                        placeholder="City"
+                        value={cityFilter}
+                        onChange={(e) => setCityFilter(e.target.value)}
+                        className="p-2 border rounded text-sm w-32"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Product"
+                        value={productFilter}
+                        onChange={(e) => setProductFilter(e.target.value)}
+                        className="p-2 border rounded text-sm w-32"
+                    />
+                    <input
+                        type="date"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        className="p-2 border rounded text-sm w-auto"
+                    />
+                    <div className="flex items-center gap-1">
+                        <input
+                            type="number"
+                            placeholder="Min Price"
+                            value={minPrice}
+                            onChange={(e) => setMinPrice(e.target.value)}
+                            className="p-2 border rounded text-sm w-24"
+                        />
+                        <span className="text-gray-400">-</span>
+                        <input
+                            type="number"
+                            placeholder="Max Price"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(e.target.value)}
+                            className="p-2 border rounded text-sm w-24"
+                        />
+                    </div>
+                    {/* Clear Filters Button */}
+                    {(cityFilter || productFilter || dateFilter || minPrice || maxPrice || filter !== 'All' || searchTerm) && (
+                        <button
+                            onClick={() => {
+                                setCityFilter('');
+                                setProductFilter('');
+                                setDateFilter('');
+                                setMinPrice('');
+                                setMaxPrice('');
+                                setFilter('All');
+                                setSearchTerm('');
+                            }}
+                            className="text-sm text-red-500 hover:text-red-700 underline"
+                        >
+                            Clear
+                        </button>
+                    )}
                 </div>
             </div>
 

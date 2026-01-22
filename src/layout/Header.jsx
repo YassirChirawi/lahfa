@@ -11,9 +11,9 @@ const Header = () => {
                 </button>
                 <div className="user-profile">
                     <div className="avatar">
-                        <User size={20} />
+                        <img src="/eya-profile.png" alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                     </div>
-                    <span>Admin User</span>
+                    <span>Eya OUCHENE <span style={{ fontSize: '1.2rem' }}>🎀</span></span>
                 </div>
             </div>
         </header>
