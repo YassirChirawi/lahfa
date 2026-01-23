@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { ShoppingCart, PieChart, Wallet, Users, Box } from 'lucide-react';
+import { ShoppingCart, PieChart, Wallet, Users, Box, Clock } from 'lucide-react';
 
 const Sidebar = () => {
   return (
@@ -29,6 +29,10 @@ const Sidebar = () => {
         <NavLink to="/products" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Box size={20} />
           <span>Produits</span>
+        </NavLink>
+        <NavLink to="/history" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Clock size={20} />
+          <span>Historique</span>
         </NavLink>
       </nav>
     </aside>

@@ -10,6 +10,7 @@ import { ClientProvider } from './context/ClientContext';
 import Clients from './pages/Clients';
 import { ProductProvider } from './context/ProductContext';
 import Products from './pages/Products';
+import History from './pages/History';
 
 import { SecurityProvider, useSecurity } from './context/SecurityContext';
 import LockScreen from './components/LockScreen';
@@ -30,6 +31,7 @@ const AppContent = () => {
               <Route path="finances" element={<Finances />} />
               <Route path="clients" element={<Clients />} />
               <Route path="products" element={<Products />} />
+              <Route path="history" element={<History />} />
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

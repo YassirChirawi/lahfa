@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, runTransaction } from 'firebase/firestore';
 
 const OrderContext = createContext();
 
@@ -17,6 +17,21 @@ export const OrderProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const { syncClientFromOrder } = useClients();
     const { decrementStock } = useProducts();
+
+    // Helper: Log Action
+    const logAction = async (action, orderId, details) => {
+        try {
+            await addDoc(collection(db, 'logs'), {
+                action,
+                orderId,
+                details,
+                timestamp: new Date().toISOString(),
+                user: 'Admin' // Placeholder for now
+            });
+        } catch (e) {
+            console.error("Error logging action:", e);
+        }
+    };
 
     useEffect(() => {
         // Subscribe to real-time updates
@@ -39,23 +54,53 @@ export const OrderProvider = ({ children }) => {
 
     const addOrder = async (order) => {
         try {
-            const newOrder = {
-                ...order,
-                // Firestore creates its own ID, but we can store a display ID if we want
-                // For now, let's keep the existing logic for display fields
-                displayId: `ORD-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
-                date: new Date().toISOString().split('T')[0],
-                status: order.status || 'Packing'
-            };
-            await addDoc(collection(db, 'orders'), newOrder);
+            await runTransaction(db, async (transaction) => {
+                // 1. Get the current counter
+                const counterRef = doc(db, 'counters', 'orderCounter');
+                const counterDoc = await transaction.get(counterRef);
 
-            // Sync with Client Context
-            await syncClientFromOrder(newOrder);
+                let newCount = 1;
+                if (counterDoc.exists()) {
+                    newCount = (counterDoc.data().count || 0) + 1;
+                }
 
-            // Decrement Stock if Product ID exists
-            if (newOrder.productId) {
-                await decrementStock(newOrder.productId, newOrder.quantity || 1);
-            }
+                // 2. Increment the counter
+                transaction.set(counterRef, { count: newCount }, { merge: true });
+
+                // 3. Generate sequential ID
+                const displayId = `ORD-${newCount.toString().padStart(4, '0')}`;
+
+                // 4. Create the new order
+                const newOrderRef = doc(collection(db, 'orders')); // Auto-generate Firestore ID
+                const newOrder = {
+                    ...order,
+                    displayId: displayId,
+                    date: new Date().toISOString().split('T')[0],
+                    status: order.status || 'Packing',
+                    createdAt: new Date().toISOString()
+                };
+
+                transaction.set(newOrderRef, newOrder);
+
+                // Note: Side effects (syncClient, stock) must be done AFTER transaction or handled carefully.
+                // We'll perform them after successful commitment merely by relying on the code execution flow below,
+                // but strictly speaking we can't return from void transaction easily to local variables unless we wrap.
+                // However, transaction function can return values!
+                return { newOrder, newId: newOrderRef.id };
+            }).then(async ({ newOrder, newId }) => {
+                // Side effects after successful transaction
+                // Sync with Client Context
+                await syncClientFromOrder({ ...newOrder, id: newId });
+
+                // Decrement Stock if Product ID exists
+                if (newOrder.productId) {
+                    await decrementStock(newOrder.productId, newOrder.quantity || 1);
+                }
+
+                // Log Creation
+                await logAction('ORDER_CREATED', newId, `Order #${displayId} created for ${newOrder.customer}`);
+            });
+
         } catch (e) {
             console.error("Error adding document: ", e);
         }
@@ -67,6 +112,11 @@ export const OrderProvider = ({ children }) => {
             await updateDoc(orderRef, {
                 status: newStatus
             });
+
+            // Log Status Change
+            const order = orders.find(o => o.id === id);
+            const displayId = order?.displayId || id;
+            await logAction('STATUS_CHANGED', id, `Order #${displayId} status changed to ${newStatus}`);
         } catch (e) {
             console.error("Error updating document: ", e);
         }
@@ -95,6 +145,7 @@ export const OrderProvider = ({ children }) => {
                 deleted: true,
                 deletedAt: new Date().toISOString()
             });
+            await logAction('ORDER_DELETED', id, 'Order moved to trash');
         } catch (e) {
             console.error("Error deleting document: ", e);
         }
@@ -107,6 +158,7 @@ export const OrderProvider = ({ children }) => {
                 deleted: false,
                 deletedAt: null
             });
+            await logAction('ORDER_RESTORED', id, 'Order restored from trash');
         } catch (e) {
             console.error("Error restoring document: ", e);
         }
