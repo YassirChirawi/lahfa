@@ -27,7 +27,6 @@ const Finances = () => {
     const [newExpense, setNewExpense] = useState({ description: '', amount: '' });
 
     // --- KPI Calculations ---
-    const today = new Date().toISOString().split('T')[0];
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
 
@@ -38,12 +37,29 @@ const Finances = () => {
 
     const revenueThisMonth = ordersThisMonth
         .reduce((sum, o) => {
-            if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+            if (o.status === 'Livré') {
+                const amount = parseFloat(o.amount) || 0;
+                const delivery = parseFloat(o.deliveryFee) || 0;
+                return sum + Math.max(0, amount - delivery);
+            }
             return sum;
         }, 0);
 
     const totalRevenue = orders.reduce((sum, o) => {
-        if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+        if (o.status === 'Livré') {
+            const amount = parseFloat(o.amount) || 0;
+            const delivery = parseFloat(o.deliveryFee) || 0;
+            return sum + Math.max(0, amount - delivery);
+        }
+        return sum;
+    }, 0);
+
+    const totalPendingRevenue = orders.reduce((sum, o) => {
+        if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
+            const amount = parseFloat(o.amount) || 0;
+            const delivery = parseFloat(o.deliveryFee) || 0;
+            return sum + Math.max(0, amount - delivery);
+        }
         return sum;
     }, 0);
 
@@ -67,7 +83,11 @@ const Finances = () => {
             const dailyRevenue = orders
                 .filter(o => o.date === dateStr)
                 .reduce((sum, o) => {
-                    if (o.status === 'Livré') return sum + (parseFloat(o.amount) || 0);
+                    if (o.status === 'Livré') {
+                        const amount = parseFloat(o.amount) || 0;
+                        const delivery = parseFloat(o.deliveryFee) || 0;
+                        return sum + Math.max(0, amount - delivery);
+                    }
                     return sum;
                 }, 0);
 
@@ -109,7 +129,7 @@ const Finances = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 <KPICard
                     title="Revenue (Month)"
                     value={`${revenueThisMonth.toFixed(2)} DH`}
@@ -121,6 +141,12 @@ const Finances = () => {
                     value={`${netProfit.toFixed(2)} DH`}
                     icon={TrendingUp}
                     colorClass="bg-indigo-50 text-indigo-600"
+                />
+                <KPICard
+                    title="Pending Total"
+                    value={`${totalPendingRevenue.toFixed(2)} DH`}
+                    icon={Activity}
+                    colorClass="bg-orange-100 text-orange-700"
                 />
                 <KPICard
                     title="Total Expenses"

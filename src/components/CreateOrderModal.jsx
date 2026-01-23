@@ -15,6 +15,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         color: '',
         quantity: 1,
         amount: '',
+        deliveryFee: 0,
         status: 'Packing'
     };
 
@@ -42,6 +43,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                 color: initialData.color || (initialData.items && initialData.items[0]?.color) || '',
                 quantity: initialData.quantity || (initialData.items && initialData.items[0]?.quantity) || 1,
                 amount: initialData.amount || '',
+                deliveryFee: initialData.deliveryFee || 0,
                 status: initialData.status || 'Packing',
                 // Keep ID if needed for update logic outside
                 id: initialData.id
@@ -57,7 +59,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'amount' || name === 'quantity' ? parseFloat(value) : value
+            [name]: name === 'amount' || name === 'quantity' || name === 'deliveryFee' ? parseFloat(value) : value
         }));
     };
 
@@ -291,7 +293,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Prix (DH)</label>
+                            <label>Prix Total (DH)</label>
                             <input
                                 type="number"
                                 name="amount"
@@ -300,6 +302,19 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                                 step="0.01"
                                 value={formData.amount}
                                 onChange={handleChange}
+                                placeholder="Total à payer"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Frais Livraison (DH)</label>
+                            <input
+                                type="number"
+                                name="deliveryFee"
+                                min="0"
+                                step="1"
+                                value={formData.deliveryFee}
+                                onChange={handleChange}
+                                placeholder="0"
                             />
                         </div>
                         <div className="form-group">

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useOrders } from '../context/OrderContext';
 import KPICard from '../components/KPICard';
-import { DollarSign, ShoppingBag, TrendingUp, Users } from 'lucide-react';
+import { DollarSign, ShoppingBag, TrendingUp, Users, Activity, FileText } from 'lucide-react';
+import { generateInvoice } from '../utils/generateInvoice';
 import '../styles/orders.css';
 
 const Dashboard = () => {
@@ -12,7 +13,11 @@ const Dashboard = () => {
     // Revenue: Livré (+) - Retour (-) 
     // Note: This logic duplicates Finances.jsx. Ideally move to Context.
     const totalRevenue = orders.reduce((sum, order) => {
-        if (order.status === 'Livré') return sum + (parseFloat(order.amount) || 0);
+        if (order.status === 'Livré') {
+            const amount = parseFloat(order.amount) || 0;
+            const delivery = parseFloat(order.deliveryFee) || 0;
+            return sum + Math.max(0, amount - delivery);
+        }
         return sum;
     }, 0);
 
@@ -20,9 +25,15 @@ const Dashboard = () => {
     // Active orders: everything not delivered, returned or cancelled (simplification)
     const activeOrders = orders.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
 
-    // Calculate AOV (based on delivered orders only to be accurate with revenue)
-    const deliveredOrdersCount = orders.filter(o => o.status === 'Livré').length;
-    const averageOrderValue = deliveredOrdersCount > 0 ? (totalRevenue / deliveredOrdersCount) : 0;
+    // Total Pending Revenue
+    const totalPendingRevenue = orders.reduce((sum, o) => {
+        if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
+            const amount = parseFloat(o.amount) || 0;
+            const delivery = parseFloat(o.deliveryFee) || 0;
+            return sum + Math.max(0, amount - delivery);
+        }
+        return sum;
+    }, 0);
 
     return (
         <div>
@@ -37,18 +48,18 @@ const Dashboard = () => {
                     icon={DollarSign}
                 />
                 <KPICard
+                    title="Pending Total"
+                    value={`${totalPendingRevenue.toFixed(2)} DH`}
+                    change="-"
+                    trend="up"
+                    icon={Activity}
+                />
+                <KPICard
                     title="Total Commandes"
                     value={totalOrders}
                     change="-"
                     trend="up"
                     icon={ShoppingBag}
-                />
-                <KPICard
-                    title="Panier Moyen"
-                    value={`${averageOrderValue.toFixed(2)} DH`}
-                    change="-"
-                    trend="down"
-                    icon={TrendingUp}
                 />
                 <KPICard
                     title="Commandes en cours"
@@ -70,6 +81,7 @@ const Dashboard = () => {
                                 <th>Article</th>
                                 <th>Montant</th>
                                 <th>Statut</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -98,6 +110,15 @@ const Dashboard = () => {
                                                 <option value="Pas de réponse client">Pas de réponse</option>
                                                 <option value="Retour">Retour</option>
                                             </select>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                                                onClick={() => generateInvoice(order)}
+                                                title="Télécharger Facture"
+                                            >
+                                                <FileText size={18} />
+                                            </button>
                                         </td>
                                     </tr>
                                 );

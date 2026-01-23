@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useOrders } from '../context/OrderContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText } from 'lucide-react';
+import { generateInvoice } from '../utils/generateInvoice';
 import '../styles/orders.css';
 import '../styles/modal.css';
 
@@ -265,6 +266,9 @@ const Orders = () => {
                                                         </select>
                                                         <button className="icon-btn-sm" onClick={() => openEditModal(order)} title="Modifier">
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                                        </button>
+                                                        <button className="icon-btn-sm text-blue-500 hover:bg-blue-50" onClick={() => generateInvoice(order)} title="Télécharger Facture">
+                                                            <FileText size={16} />
                                                         </button>
                                                         <button className="icon-btn-sm text-red-500 hover:bg-red-50" onClick={() => deleteOrder(order.id)} title="Supprimer">
                                                             <Trash2 size={16} />
