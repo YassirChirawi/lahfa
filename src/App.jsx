@@ -11,6 +11,7 @@ import Clients from './pages/Clients';
 import { ProductProvider } from './context/ProductContext';
 import Products from './pages/Products';
 import History from './pages/History';
+import Settings from './pages/Settings';
 
 import { SecurityProvider, useSecurity } from './context/SecurityContext';
 import LockScreen from './components/LockScreen';
@@ -32,6 +33,7 @@ const AppContent = () => {
               <Route path="clients" element={<Clients />} />
               <Route path="products" element={<Products />} />
               <Route path="history" element={<History />} />
+              <Route path="settings" element={<Settings />} />
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

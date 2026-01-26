@@ -8,11 +8,13 @@ import '../styles/orders.css';
 const Dashboard = () => {
     const { orders, updateOrderStatus } = useOrders();
 
-    // Calculate Metrics
+    // Filter out deleted orders for all metrics and display
+    const activeOrdersList = orders.filter(o => !o.deleted);
+
     // Calculate Metrics
     // Revenue: Livré (+) - Retour (-) 
     // Note: This logic duplicates Finances.jsx. Ideally move to Context.
-    const totalRevenue = orders.reduce((sum, order) => {
+    const totalRevenue = activeOrdersList.reduce((sum, order) => {
         if (order.status === 'Livré') {
             const amount = parseFloat(order.amount) || 0;
             const delivery = parseFloat(order.deliveryFee) || 0;
@@ -21,12 +23,12 @@ const Dashboard = () => {
         return sum;
     }, 0);
 
-    const totalOrders = orders.length;
+    const totalOrders = activeOrdersList.length;
     // Active orders: everything not delivered, returned or cancelled (simplification)
-    const activeOrders = orders.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
+    const activeOrdersCount = activeOrdersList.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
 
     // Total Pending Revenue
-    const totalPendingRevenue = orders.reduce((sum, o) => {
+    const totalPendingRevenue = activeOrdersList.reduce((sum, o) => {
         if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
             const amount = parseFloat(o.amount) || 0;
             const delivery = parseFloat(o.deliveryFee) || 0;
@@ -63,7 +65,7 @@ const Dashboard = () => {
                 />
                 <KPICard
                     title="Commandes en cours"
-                    value={activeOrders}
+                    value={activeOrdersCount}
                     change="-"
                     trend="up"
                     icon={Users}
@@ -71,7 +73,7 @@ const Dashboard = () => {
             </div>
 
             <div className="card p-6">
-                <h3 className="font-bold mb-4" style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Toutes les Commandes</h3>
+                <h3 className="font-bold mb-4" style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Commandes Récentes</h3>
                 <div className="orders-table-container">
                     <table className="orders-table">
                         <thead>
@@ -85,7 +87,7 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.map(order => {
+                            {activeOrdersList.slice(0, 10).map(order => { // Limit to recent 10 for better dashboard view? or show all non-deleted? Original showed all. keeping logic similar but filtered.
                                 const items = order.items || [{ article: order.article }];
                                 const displayArticle = items[0]?.article || '-';
                                 const moreCount = items.length > 1 ? ` (+${items.length - 1})` : '';

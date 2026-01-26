@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useOrders } from '../context/OrderContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
+import olivraisonService from '../services/olivraisonService';
+import { toast } from 'react-hot-toast';
 import '../styles/orders.css';
 import '../styles/modal.css';
 
@@ -74,6 +76,53 @@ const Orders = () => {
         setEditingOrder(order);
         setIsModalOpen(true);
     };
+
+    const handleSendToDelivery = async (order) => {
+        if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Olivraison ?`)) return;
+
+        const toastId = toast.loading("Envoi en cours...");
+        try {
+            const result = await olivraisonService.createPackage(order);
+            await updateOrder(order.id, {
+                status: 'Ramassage', // Default status after creating? Or keep 'Packing'? Usually implies ready to pickup
+                deliveryValues: {
+                    trackingID: result.trackingID,
+                    status: result.status,
+                    sentAt: new Date().toISOString()
+                }
+            });
+            toast.success("Commande envoyée avec succès !", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur: ${error.message}`, { id: toastId });
+        }
+    };
+
+    const handleSyncStatus = async (order) => {
+        if (!order.deliveryValues?.trackingID) return;
+
+        const toastId = toast.loading("Synchronisation...");
+        try {
+            const result = await olivraisonService.getPackageStatus(order.deliveryValues.trackingID);
+            // Map Olivraison status to local status if needed
+            // Example result.status: "string" -> Local mapping?
+            // For now, just update the delivery metadata and maybe the main status if it matches
+
+            await updateOrder(order.id, {
+                deliveryValues: {
+                    ...order.deliveryValues,
+                    status: result.status,
+                    lastSync: new Date().toISOString()
+                },
+                // Optional: Update main status if it makes sense (e.g. if Delivery says "Delivered", set to "Livré")
+                // status: mapDeliveryStatus(result.status) || order.status 
+            });
+            toast.success(`Statut synchronisé: ${result.status}`, { id: toastId });
+        } catch (error) {
+            toast.error("Erreur de synchronisation", { id: toastId });
+        }
+    };
+
 
     return (
         <div className="orders-page">
@@ -270,7 +319,47 @@ const Orders = () => {
                                                         <button className="icon-btn-sm text-blue-500 hover:bg-blue-50" onClick={() => generateInvoice(order)} title="Télécharger Facture">
                                                             <FileText size={16} />
                                                         </button>
-                                                        <button className="icon-btn-sm text-red-500 hover:bg-red-50" onClick={() => deleteOrder(order.id)} title="Supprimer">
+
+                                                        {/* Delivery Integration */}
+                                                        {!order.deliveryValues?.trackingID ? (
+                                                            <button
+                                                                className="icon-btn-sm text-orange-500 hover:bg-orange-50"
+                                                                onClick={() => handleSendToDelivery(order)}
+                                                                title="Envoyer à Olivraison"
+                                                            >
+                                                                <Truck size={16} />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                className="icon-btn-sm text-green-600 hover:bg-green-50"
+                                                                onClick={() => handleSyncStatus(order)}
+                                                                title={`Suivi: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}`}
+                                                            >
+                                                                <RefreshCw size={16} />
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            className="icon-btn-sm text-red-500 hover:bg-red-50"
+                                                            onClick={async () => {
+                                                                if (order.deliveryValues?.trackingID) {
+                                                                    if (window.confirm("Cette commande est liée à Olivraison. Voulez-vous aussi l'annuler chez Olivraison ?")) {
+                                                                        const toastId = toast.loading("Annulation chez Olivraison...");
+                                                                        try {
+                                                                            await olivraisonService.cancelPackage(order.deliveryValues.trackingID);
+                                                                            toast.success("Annulé sur Olivraison", { id: toastId });
+                                                                        } catch (e) {
+                                                                            console.error(e);
+                                                                            toast.error("Erreur annulation Olivraison: " + e.message, { id: toastId });
+                                                                            if (!window.confirm("L'annulation a échoué. Voulez-vous quand même supprimer la commande localement ?")) {
+                                                                                return;
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                deleteOrder(order.id);
+                                                            }}
+                                                            title="Supprimer">
                                                             <Trash2 size={16} />
                                                         </button>
                                                     </>
