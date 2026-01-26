@@ -1,28 +1,11 @@
 import React, { useState } from 'react';
 import { useSecurity } from '../context/SecurityContext';
-import { Lock, Fingerprint } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 const LockScreen = () => {
-    const { unlock, verifyBiometrics, hasBiometrics } = useSecurity();
+    const { unlock } = useSecurity();
     const [pin, setPin] = useState('');
     const [error, setError] = useState(false);
-    const [isBioLoading, setIsBioLoading] = useState(false);
-
-    React.useEffect(() => {
-        // Auto-trigger biometrics if available
-        if (hasBiometrics) {
-            handleBiometricAuth();
-        }
-    }, [hasBiometrics]);
-
-    const handleBiometricAuth = async () => {
-        setIsBioLoading(true);
-        const success = await verifyBiometrics();
-        setIsBioLoading(false);
-        if (!success) {
-            // Optional: visual feedback or keep showing PIN
-        }
-    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -92,28 +75,6 @@ const LockScreen = () => {
                     >
                         Unlock System
                     </button>
-
-                    {hasBiometrics && (
-                        <button
-                            type="button"
-                            onClick={handleBiometricAuth}
-                            className="flex items-center justify-center gap-2"
-                            style={{
-                                width: '100%',
-                                marginTop: '1rem',
-                                padding: '0.75rem',
-                                background: 'transparent',
-                                border: '1px solid hsl(var(--primary))',
-                                color: 'hsl(var(--primary))',
-                                borderRadius: 'var(--radius)',
-                                fontSize: '1rem'
-                            }}
-                            disabled={isBioLoading}
-                        >
-                            <Fingerprint size={20} />
-                            {isBioLoading ? 'Verifying...' : 'Use FaceID / TouchID'}
-                        </button>
-                    )}
                     {error && (
                         <p style={{ color: 'hsl(var(--destructive))', marginTop: '1rem' }}>
                             Incorrect PIN Code
