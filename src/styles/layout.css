@@ -205,11 +205,27 @@
 
     /* Table Responsiveness */
     .orders-table-container {
+        display: block;
+        width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
 
+    .orders-table {
+        min-width: 800px;
+        /* Force table to be wide enough to trigger scroll */
+    }
+
     .card {
         padding: 1rem;
+    }
+
+    /* Ensure Header text doesn't overflow */
+    .header-title {
+        font-size: 1.1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
     }
 }

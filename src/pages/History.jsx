@@ -54,8 +54,8 @@ const History = () => {
                 <p className="text-gray-500 text-sm mt-1">Suivi des actions et changements d'état</p>
             </div>
 
-            <div className="card overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            <div className="card orders-table-container">
+                <table className="orders-table">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm">
                             <th className="p-4 font-medium">Date & Heure</th>

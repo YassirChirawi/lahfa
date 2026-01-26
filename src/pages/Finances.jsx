@@ -251,7 +251,7 @@ const Finances = () => {
                     </button>
                 </form>
 
-                <div className="overflow-x-auto">
+                <div className="orders-table-container">
                     <table className="orders-table">
                         <thead>
                             <tr>

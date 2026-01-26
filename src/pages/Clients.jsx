@@ -144,7 +144,7 @@ export default function Clients() {
             </div>
 
             {/* Table */}
-            <div className="card overflow-hidden orders-table-container">
+            <div className="card orders-table-container">
                 <table className="orders-table">
                     <thead>
                         <tr>

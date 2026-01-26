@@ -12,7 +12,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <img src="/logo.jpg" alt="LAHFA Intimate" className="logo-img" style={{ maxWidth: '40px', borderRadius: '8px' }} />
+          <img src="/pwa-192x192.png" alt="Lahfa'h" className="logo-img" style={{ maxWidth: '40px', borderRadius: '8px' }} />
           <h2>Lahfa'h</h2>
         </div>
         <nav className="sidebar-nav">
