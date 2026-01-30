@@ -11,13 +11,13 @@ export const DEFAULT_TEMPLATES = {
 
 // Darija Templates
 export const DARIJA_TEMPLATES = {
-    'packing': "Salam [Client], wslatna la commande dialk f [Store].\n\n📄 *Tafassil* :\n[Ticket]\n\nBach nsiftoha lik l [Ville], momkin t'akder lina l'adresse o lweqt ? Jawbna b 'OUI' bach nvalidiw. ✅",
-    'ramassage': "Salam [Client], commande dialk wjdat bach n3tiwha l livreur.",
-    'livraison': "Salam [Client], ra livreur jay 3endk l [Ville], 7di m3a ton tel ghadi i3eyet lik 9rib.",
-    'livré': "Salam [Client], commande dialk wslatek. Chokran hit teqti fina o ntmenaw ikon produit 3ejbek.",
-    'pas de réponse client': "Salam [Client], livreur 3eyet likom o malqakomch, mazal baghin la commande ? Chokran.",
-    'retour': "Salam [Client], commande dialk atrje3 lina. Ila mazal baghiha 3eyet lina f aqreb weqt chokran.",
-    'annulé': "Salam [Client], commande dialk tghat (annulée)."
+    'packing': "Salam [Client] 💖, wslatna la commande dialk f [Store] !\n\n📄 *Tafassil* :\n[Ticket]\n\nBach nsiftoha lik l [Ville], momkin t'akder lina l'adresse o lweqt ? Jawbna b 'OUI' bach nvalidiw. ✅",
+    'ramassage': "Salam [Client] 📦, commande dialk wjdat bach n3tiwha l livreur.",
+    'livraison': "Salam [Client] 🤍, ra livreur jay 3endk l [Ville].\n7di m3a ton tel ghadi i3eyet lik 9rib 📞.\nChokran 🌸",
+    'livré': "Salam [Client] ✨\nCommande dialk wslatek. Chokran hit teqti fina o ntmenaw ikon produit 3ejbek 💌\nMerhba bik f [Store] 🌸",
+    'pas de réponse client': "Salam [Client] 🌸, livreur 3eyet likom o malqakomch 📞. Mazal baghin la commande ? Chokran ✨.",
+    'retour': "Salam [Client], commande dialk atrje3 lina ↩️. Ila mazal baghiha 3eyet lina f aqreb weqt chokran.",
+    'annulé': "Salam [Client], commande dialk tghat (annulée) ❌."
 };
 
 /**
