@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useOrders } from '../context/OrderContext';
 import KPICard from '../components/KPICard';
 import { DollarSign, ShoppingBag, TrendingUp, Users, Activity, FileText } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import '../styles/orders.css';
+import WhatsAppPreviewModal from '../components/WhatsAppPreviewModal';
 
 const Dashboard = () => {
     const { orders, updateOrderStatus } = useOrders();
+    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+    const [whatsappOrder, setWhatsappOrder] = useState(null);
+    // Determine default language logic? Dashboard might not have the toggle. 
+    // We can default to 'fr' or assume Modal handles it (it defaults to 'fr').
+    // Use a fixed default 'fr' for now as Dashboard doesn't have the toggle UI like Orders page.
 
     // Filter out deleted orders for all metrics and display
     const activeOrdersList = orders.filter(o => !o.deleted);
@@ -37,8 +43,27 @@ const Dashboard = () => {
         return sum;
     }, 0);
 
+    const handleStatusChange = (orderId, newStatus) => {
+        updateOrderStatus(orderId, newStatus);
+
+        // Trigger WhatsApp Modal
+        const order = orders.find(o => o.id === orderId);
+        if (order && order.phone) {
+            const updatedOrder = { ...order, status: newStatus };
+            setWhatsappOrder(updatedOrder);
+            setIsWhatsAppModalOpen(true);
+        }
+    };
+
     return (
         <div>
+            <WhatsAppPreviewModal
+                isOpen={isWhatsAppModalOpen}
+                onClose={() => setIsWhatsAppModalOpen(false)}
+                order={whatsappOrder}
+                initialLang='fr'
+            />
+
             <h1 className="text-2xl font-bold mb-6" style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Dashboard Overview</h1>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -101,7 +126,7 @@ const Dashboard = () => {
                                         <td>
                                             <select
                                                 value={order.status}
-                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                                 className="status-select"
                                                 onClick={(e) => e.stopPropagation()}
                                             >

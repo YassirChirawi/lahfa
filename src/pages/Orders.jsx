@@ -3,10 +3,13 @@ import { useOrders } from '../context/OrderContext';
 import CreateOrderModal from '../components/CreateOrderModal';
 import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
+import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
 import { toast } from 'react-hot-toast';
 import '../styles/orders.css';
 import '../styles/modal.css';
+
+import WhatsAppPreviewModal from '../components/WhatsAppPreviewModal';
 
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
@@ -20,6 +23,11 @@ const Orders = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState(null);
     const [showTrash, setShowTrash] = useState(false); // Toggle for deleted orders
+    const [whatsappLang, setWhatsappLang] = useState('fr'); // 'fr' or 'darija'
+
+    // WhatsApp Modal State
+    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+    const [whatsappOrder, setWhatsappOrder] = useState(null);
 
     const filteredOrders = orders.filter(order => {
         // Trash Mode: Only show deleted. Normal Mode: Only show non-deleted.
@@ -77,6 +85,31 @@ const Orders = () => {
         setIsModalOpen(true);
     };
 
+    const handleOpenWhatsApp = (order) => {
+        setWhatsappOrder(order);
+        setIsWhatsAppModalOpen(true);
+    };
+
+    const handleStatusChange = async (orderId, newStatus) => {
+        await updateOrderStatus(orderId, newStatus);
+
+        // Suggest WhatsApp message if status is relevant
+        // Find the order again (or construct a temp object) to show correct status in preview
+        const order = orders.find(o => o.id === orderId);
+        if (order && order.phone) {
+            // Create a temp object with new status for the preview, as the state update might be slightly delayed 
+            // or we want to be explicit about what we are previewing.
+            // Actually, since we awaited updateOrderStatus context usually updates fast, 
+            // but to be safe and snappy we pass the overridden status.
+            const updatedOrder = { ...order, status: newStatus };
+            setWhatsappOrder(updatedOrder);
+            setIsWhatsAppModalOpen(true);
+            toast.success(`Statut mis à jour. Préparation du message WhatsApp...`);
+        } else {
+            toast.success("Statut mis à jour.");
+        }
+    };
+
     const handleSendToDelivery = async (order) => {
         if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Olivraison ?`)) return;
 
@@ -126,6 +159,13 @@ const Orders = () => {
 
     return (
         <div className="orders-page">
+            <WhatsAppPreviewModal
+                isOpen={isWhatsAppModalOpen}
+                onClose={() => setIsWhatsAppModalOpen(false)}
+                order={whatsappOrder}
+                initialLang={whatsappLang}
+            />
+
             <div className="page-header">
                 <div>
                     <h1>Orders</h1>
@@ -157,6 +197,23 @@ const Orders = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+                {/* Language Toggle Global Preference */}
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                    <button
+                        onClick={() => setWhatsappLang('fr')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${whatsappLang === 'fr' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        title="Langue par défaut pour WhatsApp"
+                    >
+                        🇫🇷 FR
+                    </button>
+                    <button
+                        onClick={() => setWhatsappLang('darija')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${whatsappLang === 'darija' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        title="Langue par défaut pour WhatsApp"
+                    >
+                        🇲🇦 DAR
+                    </button>
                 </div>
                 <div className="filter-group">
                     <Filter size={18} />
@@ -303,7 +360,7 @@ const Orders = () => {
                                                     <>
                                                         <select
                                                             value={order.status}
-                                                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                                            onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                                             className="status-select"
                                                         >
                                                             <option value="Packing">Packing</option>
@@ -385,6 +442,16 @@ const Orders = () => {
                                                         </button>
                                                     </div>
                                                 )}
+                                                {/* WhatsApp Button */}
+                                                {!showTrash && order.phone && (
+                                                    <button
+                                                        onClick={() => handleOpenWhatsApp(order)}
+                                                        className="icon-btn-sm text-green-500 hover:bg-green-50 ml-1"
+                                                        title={`Envoyer message WhatsApp (${order.status}) - ${whatsappLang.toUpperCase()}`}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -405,7 +472,7 @@ const Orders = () => {
                 onSave={handleSaveOrder}
                 initialData={editingOrder}
             />
-        </div>
+        </div >
     );
 };
 
