@@ -7,6 +7,13 @@ import { storage } from '../firebase';
 const Products = () => {
     const { products, addProduct, updateProduct, deleteProduct, loading } = useProducts();
     const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('name');
+    const [sortOrder, setSortOrder] = useState('asc');
+    const [filterColor, setFilterColor] = useState('');
+    const [filterMinPrice, setFilterMinPrice] = useState('');
+    const [filterMaxPrice, setFilterMaxPrice] = useState('');
+    const [filterStock, setFilterStock] = useState('all');
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -22,9 +29,37 @@ const Products = () => {
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = products
+        .filter(p => {
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesColor = filterColor ? (p.color && p.color.toLowerCase().includes(filterColor.toLowerCase())) : true;
+            const matchesMinPrice = filterMinPrice ? parseFloat(p.price) >= parseFloat(filterMinPrice) : true;
+            const matchesMaxPrice = filterMaxPrice ? parseFloat(p.price) <= parseFloat(filterMaxPrice) : true;
+            const matchesStock = filterStock === 'all'
+                ? true
+                : filterStock === 'in_stock'
+                    ? p.stock > 0
+                    : p.stock === 0;
+
+            return matchesSearch && matchesColor && matchesMinPrice && matchesMaxPrice && matchesStock;
+        })
+        .sort((a, b) => {
+            let comparison = 0;
+            switch (sortBy) {
+                case 'name':
+                    comparison = a.name.localeCompare(b.name);
+                    break;
+                case 'price':
+                    comparison = parseFloat(a.price) - parseFloat(b.price);
+                    break;
+                case 'stock':
+                    comparison = a.stock - b.stock;
+                    break;
+                default:
+                    comparison = 0;
+            }
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
 
     const handleOpenModal = (product = null) => {
         if (product) {
@@ -100,15 +135,81 @@ const Products = () => {
                 </button>
             </div>
 
-            {/* Search */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center gap-3 w-full md:w-96">
-                <Search className="text-gray-400" size={20} />
-                <input
-                    type="text"
-                    placeholder="Search products..."
-                    className="outline-none w-full"
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            {/* Filters & Search */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex flex-wrap gap-3 items-center w-full">
+                    {/* Search */}
+                    <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50 w-full md:w-64">
+                        <Search className="text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search by reference..."
+                            className="bg-transparent outline-none w-full text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Color Filter */}
+                    <input
+                        type="text"
+                        placeholder="Filter by Color"
+                        className="px-3 py-2 border rounded-lg text-sm bg-gray-50 w-32"
+                        value={filterColor}
+                        onChange={(e) => setFilterColor(e.target.value)}
+                    />
+
+                    {/* Price Filter */}
+                    <div className="flex items-center gap-1">
+                        <input
+                            type="number"
+                            placeholder="Min Price"
+                            className="px-3 py-2 border rounded-lg text-sm bg-gray-50 w-24"
+                            value={filterMinPrice}
+                            onChange={(e) => setFilterMinPrice(e.target.value)}
+                        />
+                        <span className="text-gray-400">-</span>
+                        <input
+                            type="number"
+                            placeholder="Max Price"
+                            className="px-3 py-2 border rounded-lg text-sm bg-gray-50 w-24"
+                            value={filterMaxPrice}
+                            onChange={(e) => setFilterMaxPrice(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Stock Filter */}
+                    <select
+                        className="px-3 py-2 border rounded-lg text-sm bg-gray-50"
+                        value={filterStock}
+                        onChange={(e) => setFilterStock(e.target.value)}
+                    >
+                        <option value="all">All Stock</option>
+                        <option value="in_stock">In Stock</option>
+                        <option value="out_of_stock">Out of Stock</option>
+                    </select>
+
+                    {/* Sort */}
+                    <div className="flex items-center gap-2 ml-auto">
+                        <span className="text-sm text-gray-500">Sort by:</span>
+                        <select
+                            className="px-3 py-2 border rounded-lg text-sm bg-gray-50 font-medium"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                        >
+                            <option value="name">Reference</option>
+                            <option value="price">Price</option>
+                            <option value="stock">Stock</option>
+                        </select>
+                        <button
+                            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            className="p-2 border rounded-lg hover:bg-gray-50"
+                            title={sortOrder === 'asc' ? "Ascending" : "Descending"}
+                        >
+                            {sortOrder === 'asc' ? "↑" : "↓"}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Grid */}
