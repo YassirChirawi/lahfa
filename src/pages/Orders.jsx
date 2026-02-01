@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useOrders } from '../context/OrderContext';
+import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
 import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
@@ -13,6 +14,7 @@ import WhatsAppPreviewModal from '../components/WhatsAppPreviewModal';
 
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
+    const { products, addPendingReturn } = useProducts();
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [cityFilter, setCityFilter] = useState('');
@@ -91,16 +93,45 @@ const Orders = () => {
     };
 
     const handleStatusChange = async (orderId, newStatus) => {
+        const previousStatus = orders.find(o => o.id === orderId)?.status;
         await updateOrderStatus(orderId, newStatus);
+
+        // Handle Return Logic
+        if (newStatus === 'Retour' && previousStatus !== 'Retour') {
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+                // Find items to return
+                const itemsToReturn = order.items || [{
+                    article: order.article,
+                    quantity: order.quantity || 1,
+                    // Try to match product by name if ID usage is inconsistent/missing in older orders
+                }];
+
+                let returnedCount = 0;
+                for (const item of itemsToReturn) {
+                    // Try to find product by exact name match first (since we sort by name in catalog)
+                    const product = products.find(p => p.name === (item.article || item.name));
+                    if (product) {
+                        await addPendingReturn(product.id, item.quantity || 1);
+                        returnedCount += (item.quantity || 1);
+                    }
+                }
+                if (returnedCount > 0) {
+                    toast.custom((t) => (
+                        <div className="bg-orange-100 border border-orange-200 text-orange-800 px-4 py-2 rounded shadow-md flex items-center gap-2">
+                            <RotateCcw size={16} />
+                            <span>{returnedCount} produits marqués "En attente de retour"</span>
+                        </div>
+                    ), { duration: 3000 });
+                }
+            }
+        }
 
         // Suggest WhatsApp message if status is relevant
         // Find the order again (or construct a temp object) to show correct status in preview
         const order = orders.find(o => o.id === orderId);
         if (order && order.phone) {
-            // Create a temp object with new status for the preview, as the state update might be slightly delayed 
-            // or we want to be explicit about what we are previewing.
-            // Actually, since we awaited updateOrderStatus context usually updates fast, 
-            // but to be safe and snappy we pass the overridden status.
+            // ... (rest of whatsapp logic)
             const updatedOrder = { ...order, status: newStatus };
             setWhatsappOrder(updatedOrder);
             setIsWhatsAppModalOpen(true);

@@ -76,13 +76,54 @@ export const ProductProvider = ({ children }) => {
         }
     };
 
+    const addPendingReturn = async (productId, quantity) => {
+        try {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+            // Parse existing pendingStock, default to 0
+            const currentPending = parseInt(product.pendingStock) || 0;
+            const qtyToAdd = parseInt(quantity) || 1;
+
+            await updateProduct(productId, { pendingStock: currentPending + qtyToAdd });
+        } catch (e) {
+            console.error("Error adding pending return: ", e);
+        }
+    };
+
+    const resolvePendingReturn = async (productId, quantity) => {
+        try {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const currentPending = parseInt(product.pendingStock) || 0;
+            const currentStock = parseInt(product.stock) || 0;
+            const qtyToResolve = parseInt(quantity) || 1;
+
+            // Validate we don't resolve more than pending (unless forced, but safer to clamp)
+            // If user resolves 1 but pending is 0, nothing happens to pending, but stock still up? 
+            // Let's assume user knows what they are doing but prevent negative pending.
+            const validResolveQty = Math.min(qtyToResolve, currentPending);
+
+            if (validResolveQty <= 0) return;
+
+            await updateProduct(productId, {
+                pendingStock: currentPending - validResolveQty,
+                stock: currentStock + validResolveQty
+            });
+        } catch (e) {
+            console.error("Error resolving pending return: ", e);
+        }
+    };
+
     const value = {
         products,
         loading,
         addProduct,
         updateProduct,
         deleteProduct,
-        decrementStock
+        decrementStock,
+        addPendingReturn,
+        resolvePendingReturn
     };
 
     return (

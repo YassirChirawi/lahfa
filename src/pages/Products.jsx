@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useProducts } from '../context/ProductContext';
-import { Plus, Search, Edit2, Trash2, Package, Upload, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Package, Upload, Loader2, Share2, RotateCcw } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
+import { toast } from 'react-hot-toast';
 
 const Products = () => {
-    const { products, addProduct, updateProduct, deleteProduct, loading } = useProducts();
+    const { products, addProduct, updateProduct, deleteProduct, resolvePendingReturn, loading } = useProducts();
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('name');
     const [sortOrder, setSortOrder] = useState('asc');
@@ -117,6 +118,28 @@ const Products = () => {
         }
     };
 
+    const handleShareCatalog = () => {
+        // ... (existing share logic)
+        const params = new URLSearchParams();
+        if (searchTerm) params.append('search', searchTerm);
+        if (filterColor) params.append('color', filterColor);
+        if (filterMinPrice) params.append('minPrice', filterMinPrice);
+        if (filterMaxPrice) params.append('maxPrice', filterMaxPrice);
+        if (filterStock !== 'all') params.append('stock', filterStock);
+
+        const url = `${window.location.origin}/catalogue?${params.toString()}`;
+        navigator.clipboard.writeText(url);
+        toast.success("Lien du catalogue copié !");
+    };
+
+    const handleResolveReturn = async (product) => {
+        if (!product.pendingStock || product.pendingStock <= 0) return;
+        if (window.confirm(`Confirmer la réception de ${product.pendingStock} retours pour "${product.name}" ?\nCela va les ajouter au stock.`)) {
+            await resolvePendingReturn(product.id, product.pendingStock);
+            toast.success("Stock mis à jour !");
+        }
+    };
+
     if (loading) return <div className="p-8">Loading products...</div>;
 
     return (
@@ -127,12 +150,20 @@ const Products = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Products</h1>
                     <p className="text-gray-500">Manage your inventory</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition"
-                >
-                    <Plus size={20} /> Add Product
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleShareCatalog}
+                        className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition shadow-sm"
+                    >
+                        <Share2 size={20} /> Share Catalog
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+                    >
+                        <Plus size={20} /> Add Product
+                    </button>
+                </div>
             </div>
 
             {/* Filters & Search */}
@@ -242,8 +273,16 @@ const Products = () => {
                                 </span>
                             </div>
                             <div className="mt-3 flex gap-2 text-sm text-gray-500">
-                                {product.size && <span className="bg-gray-100 px-2 py-1 rounded">{product.size}</span>}
                                 {product.color && <span className="bg-gray-100 px-2 py-1 rounded">{product.color}</span>}
+                                {(product.pendingStock > 0) && (
+                                    <button
+                                        onClick={() => handleResolveReturn(product)}
+                                        className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold border border-orange-200 flex items-center gap-1 hover:bg-orange-200"
+                                        title="Cliquez pour valider le retour et remettre en stock"
+                                    >
+                                        <RotateCcw size={12} /> +{product.pendingStock} retour
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
