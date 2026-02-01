@@ -1,14 +1,59 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
-import { ShoppingBag, MessageCircle, Filter, Instagram, X, ZoomIn } from 'lucide-react';
+import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
+import CartDrawer from '../components/CartDrawer';
 
 const Catalogue = () => {
     const { products } = useProducts();
     const [searchParams] = useSearchParams();
-    const [zoomedProduct, setZoomedProduct] = React.useState(null);
+    const [zoomedProduct, setZoomedProduct] = useState(null);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+
+    // Cart State
+    const [cart, setCart] = useState(() => {
+        try {
+            const saved = localStorage.getItem('lahfa_cart');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    // Persist Cart
+    useEffect(() => {
+        localStorage.setItem('lahfa_cart', JSON.stringify(cart));
+    }, [cart]);
+
+    const addToCart = (product) => {
+        setCart(prev => {
+            const existing = prev.find(item => item.id === product.id && item.size === product.size && item.color === product.color);
+            if (existing) {
+                return prev.map(item =>
+                    (item.id === product.id && item.size === product.size && item.color === product.color)
+                        ? { ...item, quantity: item.quantity + 1 }
+                        : item
+                );
+            }
+            return [...prev, { ...product, quantity: 1 }];
+        });
+        toast.success("Ajouté au panier ! 🛒", { position: 'bottom-center' });
+    };
+
+    const updateQuantity = (id, size, color, delta) => {
+        setCart(prev => prev.map(item => {
+            if (item.id === id && item.size === size && item.color === color) {
+                return { ...item, quantity: Math.max(1, item.quantity + delta) };
+            }
+            return item;
+        }));
+    };
+
+    const removeFromCart = (id, size, color) => {
+        setCart(prev => prev.filter(item => !(item.id === id && item.size === size && item.color === color)));
+    };
 
     // Extract filters from URL
     const filters = useMemo(() => ({
@@ -49,12 +94,6 @@ const Catalogue = () => {
         });
     }, [products, filters]);
 
-    const handleOrder = (product) => {
-        const message = `Bonjour, je suis intéressé par votre produit : ${product.name} (Couleur: ${product.color}, Taille: ${product.size}) à ${product.price} DH.`;
-        const url = `https://wa.me/212691924932?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-    };
-
     const handleInstagram = (product) => {
         const refText = `Produit: ${product.name} - ${product.price}DH`;
         navigator.clipboard.writeText(refText).then(() => {
@@ -74,8 +113,16 @@ const Catalogue = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans">
+        <div className="min-h-screen bg-gray-50 font-sans pb-20">
             <Toaster />
+            <CartDrawer
+                isOpen={isCartOpen}
+                onClose={() => setIsCartOpen(false)}
+                cart={cart}
+                onUpdateQuantity={updateQuantity}
+                onRemove={removeFromCart}
+            />
+
             {/* Header */}
             <header className="bg-pink-50/80 backdrop-blur-md sticky top-0 z-10 px-4 py-6 border-b border-pink-100">
                 <div className="max-w-2xl mx-auto text-center space-y-2">
@@ -85,9 +132,6 @@ const Catalogue = () => {
                             Lahfa’h <span className="text-pink-600">intimate</span> ✨
                         </h1>
                     </div>
-                    <p className="text-gray-600 text-sm font-light italic">
-                        Your sensual journey begins with Lahfa’h
-                    </p>
                 </div>
 
                 {/* Active Filters Badges - Centered */}
@@ -177,14 +221,14 @@ const Catalogue = () => {
 
                                     <div className="mt-auto flex gap-2">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); handleOrder(product); }}
-                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center transition-colors"
+                                            onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center gap-1 transition-colors text-xs font-bold"
                                         >
-                                            <MessageCircle size={18} />
+                                            <Plus size={16} /> Ajouter
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleInstagram(product); }}
-                                            className="flex-1 bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-600 hover:opacity-90 text-white py-2 rounded-lg flex items-center justify-center transition-opacity"
+                                            className="w-10 bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-600 hover:opacity-90 text-white py-2 rounded-lg flex items-center justify-center transition-opacity"
                                         >
                                             <Instagram size={18} />
                                         </button>
@@ -195,6 +239,27 @@ const Catalogue = () => {
                     </div>
                 )}
             </main>
+
+            {/* Floating Cart Button (FAB) */}
+            <AnimatePresence>
+                {cart.length > 0 && (
+                    <motion.button
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        onClick={() => setIsCartOpen(true)}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-30 hover:bg-black transition-colors"
+                    >
+                        <div className="relative">
+                            <ShoppingCart size={20} />
+                            <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                            </span>
+                        </div>
+                        <span className="font-bold text-sm">Voir mon panier</span>
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
             {/* Lightbox Modal */}
             <AnimatePresence>
@@ -224,6 +289,17 @@ const Catalogue = () => {
                             <div className="mt-4 text-center">
                                 <h3 className="text-white text-xl font-bold">{zoomedProduct.name}</h3>
                                 <p className="text-pink-400 font-medium text-lg">{zoomedProduct.price} DH</p>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        addToCart(zoomedProduct);
+                                        setZoomedProduct(null);
+                                        setIsCartOpen(true);
+                                    }}
+                                    className="mt-4 bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto"
+                                >
+                                    <Plus size={18} /> Ajouter au panier
+                                </button>
                             </div>
                         </div>
                     </motion.div>
