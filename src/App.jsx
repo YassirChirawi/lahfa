@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import { OrderProvider } from './context/OrderContext';
 import Orders from './pages/Orders';
 import { ExpenseProvider } from './context/ExpenseContext';
+import { CollectionProvider } from './context/CollectionContext';
 import Finances from './pages/Finances';
 import { ClientProvider } from './context/ClientContext';
 import Clients from './pages/Clients';
@@ -49,11 +50,13 @@ function App() {
     <SecurityProvider>
       <ClientProvider>
         <ProductProvider>
-          <OrderProvider>
-            <ExpenseProvider>
-              <AppContent />
-            </ExpenseProvider>
-          </OrderProvider>
+          <CollectionProvider>
+            <OrderProvider>
+              <ExpenseProvider>
+                <AppContent />
+              </ExpenseProvider>
+            </OrderProvider>
+          </CollectionProvider>
         </ProductProvider>
       </ClientProvider>
     </SecurityProvider>

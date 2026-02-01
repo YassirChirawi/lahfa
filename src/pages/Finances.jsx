@@ -1,17 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useExpenses } from '../context/ExpenseContext';
-import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useCollections } from '../context/CollectionContext';
+import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const EXPENSE_CATEGORIES = ['Marketing', 'Stock', 'Livraison', 'Salaire', 'Autre'];
 
-const KPICard = ({ title, value, icon: Icon, colorClass, subtext }) => (
-    <div className="card p-6 flex flex-col justify-between h-full">
+const KPICard = ({ title, value, icon: Icon, colorClass, subtext, alert }) => (
+    <div className={`card p-6 flex flex-col justify-between h-full ${alert ? 'border-red-300 ring-2 ring-red-100' : ''}`}>
         <div className="flex justify-between items-start mb-2">
             <div>
                 <p className="text-sm font-medium text-gray-500">{title}</p>
-                <h3 className={`text-2xl font-bold mt-1 ${title === 'Net Profit' ? (parseFloat(value) < 0 ? 'text-red-500' : 'text-green-500') : 'text-gray-900'}`}>{value}</h3>
+                <h3 className={`text-2xl font-bold mt-1 ${title.includes('Bénéfice') ? (parseFloat(value) < 0 ? 'text-red-500' : 'text-green-500') : 'text-gray-900'}`}>{value}</h3>
             </div>
             <div className={`p-3 rounded-xl ${colorClass}`}>
                 <Icon size={20} />
@@ -24,19 +26,27 @@ const KPICard = ({ title, value, icon: Icon, colorClass, subtext }) => (
 const Finances = () => {
     const { orders } = useOrders();
     const { expenses, addExpense, deleteExpense } = useExpenses();
-    const [newExpense, setNewExpense] = useState({ description: '', amount: '' });
+    const { collections, addCollection } = useCollections();
 
-    // --- KPI Calculations ---
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    // UI States
+    const [activeTab, setActiveTab] = useState('global'); // 'global' | 'collections'
+    const [selectedCollectionId, setSelectedCollectionId] = useState('');
 
-    const ordersThisMonth = orders.filter(o => {
-        const d = new Date(o.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
+    // Form States
+    const [newExpense, setNewExpense] = useState({ description: '', amount: '', category: 'Autre', collectionId: '' });
+    const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
+    const [newCollection, setNewCollection] = useState({ name: '', startDate: '', endDate: '' });
 
-    const revenueThisMonth = ordersThisMonth
-        .reduce((sum, o) => {
+    // Set default selected collection to the most recent one on load
+    useEffect(() => {
+        if (collections.length > 0 && !selectedCollectionId) {
+            setSelectedCollectionId(collections[0].id);
+        }
+    }, [collections, selectedCollectionId]);
+
+    // --- Helpers ---
+    const calculateStats = (filteredOrders, filteredExpenses) => {
+        const revenue = filteredOrders.reduce((sum, o) => {
             if (o.status === 'Livré') {
                 const amount = parseFloat(o.amount) || 0;
                 const delivery = parseFloat(o.deliveryFee) || 0;
@@ -45,14 +55,40 @@ const Finances = () => {
             return sum;
         }, 0);
 
-    const totalRevenue = orders.reduce((sum, o) => {
-        if (o.status === 'Livré') {
-            const amount = parseFloat(o.amount) || 0;
-            const delivery = parseFloat(o.deliveryFee) || 0;
-            return sum + Math.max(0, amount - delivery);
-        }
-        return sum;
-    }, 0);
+        const expensesTotal = filteredExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+        const netProfit = revenue - expensesTotal;
+        const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+        // Return Rate
+        const totalClosedOrders = filteredOrders.filter(o => ['Livré', 'Retour'].includes(o.status)).length;
+        const returnedOrders = filteredOrders.filter(o => o.status === 'Retour').length;
+        const returnRate = totalClosedOrders > 0 ? (returnedOrders / totalClosedOrders) * 100 : 0;
+
+        // Marketing Spend (if categories used)
+        const marketingSpend = filteredExpenses
+            .filter(e => e.category === 'Marketing')
+            .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+
+        // CPA (Cost Per Acquisition) - Approx: Marketing / Delivered orders
+        const deliveredCount = filteredOrders.filter(o => o.status === 'Livré').length;
+        const cpa = deliveredCount > 0 ? marketingSpend / deliveredCount : 0;
+
+        return { revenue, expensesTotal, netProfit, margin, returnRate, marketingSpend, cpa, deliveredCount };
+    };
+
+    // --- DATA PREPARATION: Global ---
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const globalOrdersThisMonth = orders.filter(o => {
+        const d = new Date(o.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const globalStats = calculateStats(orders, expenses);
+    const monthStats = calculateStats(globalOrdersThisMonth, expenses.filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    }));
 
     const totalPendingRevenue = orders.reduce((sum, o) => {
         if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
@@ -63,181 +99,259 @@ const Finances = () => {
         return sum;
     }, 0);
 
-    const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
+    // --- DATA PREPARATION: Collections ---
+    const currentCollection = collections.find(c => c.id === selectedCollectionId);
 
-    // Active orders: not delivered, not cancelled/returned
-    const activeOrders = orders.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
+    const collectionStats = useMemo(() => {
+        if (!currentCollection) return null;
 
-    // --- Chart Data Preparation ---
+        const start = new Date(currentCollection.startDate);
+        const end = new Date(currentCollection.endDate);
+        // Include end date fully
+        end.setHours(23, 59, 59, 999);
 
-    // Revenue Trend (Last 7 Days)
+        const colOrders = orders.filter(o => {
+            const d = new Date(o.date);
+            return d >= start && d <= end;
+        });
+
+        // Expenses linked by ID OR by date range if no ID (legacy support / fallback)
+        const colExpenses = expenses.filter(e => {
+            if (e.collectionId === currentCollection.id) return true;
+            if (!e.collectionId) {
+                const d = new Date(e.date);
+                return d >= start && d <= end;
+            }
+            return false;
+        });
+
+        return calculateStats(colOrders, colExpenses);
+    }, [currentCollection, orders, expenses]);
+
+    // --- Chart Data ---
     const revenueTrendData = useMemo(() => {
         const data = [];
-        for (let i = 6; i >= 0; i--) {
+        const days = 7;
+        for (let i = days - 1; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
             const dateStr = date.toISOString().split('T')[0];
-            const dayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dayLabel = date.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' });
 
             const dailyRevenue = orders
-                .filter(o => o.date === dateStr)
-                .reduce((sum, o) => {
-                    if (o.status === 'Livré') {
-                        const amount = parseFloat(o.amount) || 0;
-                        const delivery = parseFloat(o.deliveryFee) || 0;
-                        return sum + Math.max(0, amount - delivery);
-                    }
-                    return sum;
-                }, 0);
-
+                .filter(o => o.date === dateStr && o.status === 'Livré')
+                .reduce((sum, o) => sum + (parseFloat(o.amount) || 0) - (parseFloat(o.deliveryFee) || 0), 0);
             data.push({ name: dayLabel, revenue: dailyRevenue });
         }
         return data;
     }, [orders]);
 
-    // Expenses Breakdown
     const expensesBreakdownData = useMemo(() => {
-        const grouped = expenses.reduce((acc, e) => {
-            const desc = e.description || 'Other';
-            acc[desc] = (acc[desc] || 0) + parseFloat(e.amount || 0);
+        // Use current view's expenses (Global or Collection)
+        const targetExpenses = activeTab === 'collections' && currentCollection
+            ? expenses.filter(e => e.collectionId === currentCollection.id || (!e.collectionId && new Date(e.date) >= new Date(currentCollection.startDate) && new Date(e.date) <= new Date(currentCollection.endDate)))
+            : expenses;
+
+        const grouped = targetExpenses.reduce((acc, e) => {
+            const cat = e.category || 'Autre';
+            acc[cat] = (acc[cat] || 0) + parseFloat(e.amount || 0);
             return acc;
         }, {});
 
         return Object.entries(grouped).map(([name, value]) => ({ name, value }));
-    }, [expenses]);
+    }, [expenses, activeTab, currentCollection]);
 
 
     // --- Handlers ---
     const handleAddExpense = (e) => {
         e.preventDefault();
         if (!newExpense.description || !newExpense.amount) return;
+
         addExpense({
             description: newExpense.description,
             amount: parseFloat(newExpense.amount),
-            date: new Date().toISOString()
+            category: newExpense.category,
+            collectionId: newExpense.collectionId,
         });
-        setNewExpense({ description: '', amount: '' });
+        setNewExpense({ description: '', amount: '', category: 'Autre', collectionId: '' });
+    };
+
+    const handleCreateCollection = async (e) => {
+        e.preventDefault();
+        if (!newCollection.name || !newCollection.startDate || !newCollection.endDate) return;
+
+        try {
+            await addCollection(newCollection);
+            setNewCollection({ name: '', startDate: '', endDate: '' });
+            setIsCollectionModalOpen(false);
+        } catch (error) {
+            alert("Erreur lors de la création de la collection");
+        }
     };
 
     return (
         <div className="space-y-8 p-8" style={{ backgroundColor: '#F9FAFB', minHeight: '100vh' }}>
             {/* Header */}
-            <div className="page-header">
-                <h1>Finances & Analytics</h1>
-                <p>Track revenue, expenses, and net profit.</p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Finances</h1>
+                    <p className="text-gray-500 mt-1">Suivez vos revenus, dépenses et bénéfices.</p>
+                </div>
+
+                {/* Tabs */}
+                <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex">
+                    <button
+                        onClick={() => setActiveTab('global')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'global' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Vue Globale
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('collections')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'collections' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Par Collection
+                    </button>
+                </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                <KPICard
-                    title="Revenue (Month)"
-                    value={`${revenueThisMonth.toFixed(2)} DH`}
-                    icon={DollarSign}
-                    colorClass="bg-blue-50 text-blue-600"
-                />
-                <KPICard
-                    title="Net Profit"
-                    value={`${netProfit.toFixed(2)} DH`}
-                    icon={TrendingUp}
-                    colorClass="bg-indigo-50 text-indigo-600"
-                />
-                <KPICard
-                    title="Pending Total"
-                    value={`${totalPendingRevenue.toFixed(2)} DH`}
-                    icon={Activity}
-                    colorClass="bg-orange-100 text-orange-700"
-                />
-                <KPICard
-                    title="Total Expenses"
-                    value={`${totalExpenses.toFixed(2)} DH`}
-                    icon={CreditCard}
-                    colorClass="bg-red-50 text-red-600"
-                />
-                <KPICard
-                    title="Active Orders"
-                    value={activeOrders}
-                    icon={Activity}
-                    colorClass="bg-yellow-50 text-yellow-600"
-                />
-            </div>
+            {/* --- GLOBAL VIEW CONTENT --- */}
+            {activeTab === 'global' && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <KPICard title="CA (Mois actuel)" value={`${monthStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-blue-50 text-blue-600" />
+                        <KPICard title="Bénéfice Net (Total)" value={`${globalStats.netProfit.toFixed(2)} DH`} icon={TrendingUp} colorClass="bg-green-50 text-green-600" subtext={`Marge: ${globalStats.margin.toFixed(1)}%`} />
+                        <KPICard title="Revenus en Attente" value={`${totalPendingRevenue.toFixed(2)} DH`} icon={Activity} colorClass="bg-orange-50 text-orange-600" />
+                        <KPICard title="Dépenses Totales" value={`${globalStats.expensesTotal.toFixed(2)} DH`} icon={CreditCard} colorClass="bg-red-50 text-red-600" />
+                    </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Area Chart: Revenue Trend */}
-                <div className="card p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Revenue Trend (Last 7 Days)</h3>
-                    <div style={{ width: '100%', height: 300 }}>
-                        <ResponsiveContainer>
-                            <AreaChart data={revenueTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value) => [`${value} DH`, 'Revenue']}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="card p-6">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Évolution du Revenu (7 jours)</h3>
+                            <div style={{ width: '100%', height: 300 }}>
+                                <ResponsiveContainer>
+                                    <AreaChart data={revenueTrendData}>
+                                        <defs>
+                                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} stroke="#9CA3AF" />
+                                        <YAxis axisLine={false} tickLine={false} fontSize={12} stroke="#9CA3AF" />
+                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+                                        <Area type="monotone" dataKey="revenue" stroke="#8B5CF6" fillOpacity={1} fill="url(#colorRevenue)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                        <div className="card p-6">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Dépenses par Catégorie</h3>
+                            <div style={{ width: '100%', height: 300 }}>
+                                <ResponsiveContainer>
+                                    <PieChart>
+                                        <Pie data={expensesBreakdownData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                                            {expensesBreakdownData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                        <Legend verticalAlign="bottom" iconType="circle" />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* --- COLLECTIONS VIEW CONTENT --- */}
+            {activeTab === 'collections' && (
+                <div className="space-y-6">
+                    {/* Controls */}
+                    <div className="card p-4 flex flex-wrap gap-4 items-center justify-between">
+                        <div className="flex gap-4 items-center flex-1">
+                            <div className="relative">
+                                <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Collection</label>
+                                <select
+                                    value={selectedCollectionId}
+                                    onChange={(e) => setSelectedCollectionId(e.target.value)}
+                                    className="block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+                                >
+                                    {collections.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                    {collections.length === 0 && <option>Aucune collection</option>}
+                                </select>
+                            </div>
+                            {currentCollection && (
+                                <div className="text-sm text-gray-500 mt-5">
+                                    <span className="font-medium">{new Date(currentCollection.startDate).toLocaleDateString()}</span>
+                                    {' '}&rarr;{' '}
+                                    <span className="font-medium">{new Date(currentCollection.endDate).toLocaleDateString()}</span>
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setIsCollectionModalOpen(true)}
+                            className="btn-primary flex items-center gap-2"
+                        >
+                            <Plus size={18} /> Nouvelle Collection
+                        </button>
+                    </div>
+
+                    {currentCollection && collectionStats ? (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <KPICard title="Chiffre d'Affaires" value={`${collectionStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-blue-50 text-blue-600" />
+                                <KPICard title="Dépenses Totales" value={`${collectionStats.expensesTotal.toFixed(2)} DH`} icon={CreditCard} colorClass="bg-red-50 text-red-600" />
+                                <KPICard title="Bénéfice Net" value={`${collectionStats.netProfit.toFixed(2)} DH`} icon={TrendingUp} colorClass="bg-green-50 text-green-600" subtext={`${collectionStats.margin.toFixed(1)}% Marge`} />
+                                <KPICard
+                                    title="Taux de Retour"
+                                    value={`${collectionStats.returnRate.toFixed(1)}%`}
+                                    icon={AlertCircle}
+                                    colorClass={collectionStats.returnRate > 15 ? "bg-red-50 text-red-600" : "bg-yellow-50 text-yellow-600"}
+                                    alert={collectionStats.returnRate > 20} // Alert if > 20%
                                 />
-                                <Area type="monotone" dataKey="revenue" stroke="#8884d8" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+                            </div>
 
-                {/* Pie Chart: Expenses Breakdown */}
-                <div className="card p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Expenses Breakdown</h3>
-                    <div style={{ width: '100%', height: 300 }} className="flex justify-center items-center">
-                        {expensesBreakdownData.length > 0 ? (
-                            <ResponsiveContainer>
-                                <PieChart>
-                                    <Pie
-                                        data={expensesBreakdownData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={100}
-                                        fill="#8884d8"
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {expensesBreakdownData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="text-gray-400 text-sm">No expenses recorded yet.</div>
-                        )}
-                    </div>
-                </div>
-            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <KPICard title="Budget Marketing" value={`${collectionStats.marketingSpend.toFixed(2)} DH`} icon={PieChartIcon} colorClass="bg-purple-50 text-purple-600" subtext={`CPA: ${collectionStats.cpa.toFixed(2)} DH / Commande`} />
+                                <KPICard title="Commandes Livrées" value={collectionStats.deliveredCount} icon={Activity} colorClass="bg-indigo-50 text-indigo-600" />
+                                {/* Placeholder for ROAS if we had Ad Spend input directly from FB Ads API */}
+                                <div className="card p-6 flex flex-col justify-center items-center text-center text-gray-400 border-2 border-dashed border-gray-200">
+                                    <p>ROAS (Retour Pub) requiert des données externes</p>
+                                    <small>Bientôt disponible</small>
+                                </div>
+                            </div>
 
-            {/* Expense Management Section (Collapsible or just below) */}
-            <div className="card p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Manage Expenses</h3>
-                {/* Add Form */}
-                <form onSubmit={handleAddExpense} className="flex flex-col sm:flex-row gap-4 mb-6 items-end">
-                    <div className="flex-1 w-full">
+                            {/* Collection specific charts could go here */}
+                        </>
+                    ) : (
+                        <div className="text-center py-12 text-gray-400">
+                            Sélectionnez ou créez une collection pour voir les stats.
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- EXPENSE MANAGEMENT --- */}
+            <div className="card p-6 mt-8">
+                <h3 className="text-lg font-bold text-gray-900 mb-6">Ajouter une Dépense</h3>
+                <form onSubmit={handleAddExpense} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    <div className="md:col-span-4">
                         <label className="block text-sm font-medium mb-1 text-gray-500">Description</label>
                         <input
                             type="text"
-                            placeholder="Ex: Pub Facebook, Achat..."
+                            placeholder="Ex: Pub Facebook, Emballage..."
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                             value={newExpense.description}
                             onChange={e => setNewExpense({ ...newExpense, description: e.target.value })}
                         />
                     </div>
-                    <div className="w-full sm:w-32">
-                        <label className="block text-sm font-medium mb-1 text-gray-500">Amount (DH)</label>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1 text-gray-500">Montant (DH)</label>
                         <input
                             type="number"
                             placeholder="0.00"
@@ -246,46 +360,123 @@ const Finances = () => {
                             onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })}
                         />
                     </div>
-                    <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 font-medium w-full sm:w-auto">
-                        <Plus size={18} /> Add
-                    </button>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1 text-gray-500">Catégorie</label>
+                        <select
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            value={newExpense.category}
+                            onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
+                        >
+                            {EXPENSE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1 text-gray-500">Collection</label>
+                        <select
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            value={newExpense.collectionId}
+                            onChange={e => setNewExpense({ ...newExpense, collectionId: e.target.value })}
+                        >
+                            <option value="">Général (Aucune)</option>
+                            {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="md:col-span-2">
+                        <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 font-medium">
+                            <Plus size={18} /> Ajouter
+                        </button>
+                    </div>
                 </form>
 
-                <div className="orders-table-container">
-                    <table className="orders-table">
-                        <thead>
+                {/* Expense List - Simplified */}
+                <div className="mt-8 overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50">
                             <tr>
-                                <th>Date</th>
-                                <th>Description</th>
-                                <th className="text-right">Amount</th>
-                                <th className="text-right">Action</th>
+                                <th className="px-4 py-2">Date</th>
+                                <th className="px-4 py-2">Description</th>
+                                <th className="px-4 py-2">Catégorie</th>
+                                <th className="px-4 py-2">Collection</th>
+                                <th className="px-4 py-2 text-right">Montant</th>
+                                <th className="px-4 py-2 text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {expenses.map(expense => (
-                                <tr key={expense.id}>
-                                    <td className="text-gray-500">{new Date(expense.date || new Date()).toLocaleDateString()}</td>
-                                    <td className="font-medium text-gray-900">{expense.description}</td>
-                                    <td className="text-red-500 font-medium text-right">- {parseFloat(expense.amount).toFixed(2)} DH</td>
-                                    <td className="text-right">
-                                        <button
-                                            onClick={() => deleteExpense(expense.id)}
-                                            className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {expenses.length === 0 && (
-                                <tr>
-                                    <td colSpan="4" className="text-center p-4 text-gray-500">No expenses recorded.</td>
-                                </tr>
-                            )}
+                        <tbody className="divide-y divide-gray-100">
+                            {expenses.slice(0, 10).map(expense => {
+                                const colName = collections.find(c => c.id === expense.collectionId)?.name || '-';
+                                return (
+                                    <tr key={expense.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-2 text-gray-500">{new Date(expense.date).toLocaleDateString()}</td>
+                                        <td className="px-4 py-2 font-medium text-gray-900">{expense.description}</td>
+                                        <td className="px-4 py-2">
+                                            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">{expense.category || 'Autre'}</span>
+                                        </td>
+                                        <td className="px-4 py-2 text-gray-500 text-xs">{colName}</td>
+                                        <td className="px-4 py-2 text-red-500 font-medium text-right text-base">- {parseFloat(expense.amount).toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-right">
+                                            <button onClick={() => deleteExpense(expense.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
+                    <div className="text-center mt-4 text-xs text-gray-400">Affichage des 10 dernières dépenses</div>
                 </div>
             </div>
+
+            {/* --- CREATE COLLECTION MODAL --- */}
+            {isCollectionModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-in-up">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold">Nouvelle Collection</h3>
+                            <button onClick={() => setIsCollectionModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                        </div>
+                        <form onSubmit={handleCreateCollection} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1 text-gray-600">Nom de la Collection</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ex: Collection Hiver 2024"
+                                    className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    value={newCollection.name}
+                                    onChange={(e) => setNewCollection({ ...newCollection, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-gray-600">Date de Début</label>
+                                    <input
+                                        type="date"
+                                        className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                        value={newCollection.startDate}
+                                        onChange={(e) => setNewCollection({ ...newCollection, startDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-gray-600">Date de Fin</label>
+                                    <input
+                                        type="date"
+                                        className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                                        value={newCollection.endDate}
+                                        onChange={(e) => setNewCollection({ ...newCollection, endDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setIsCollectionModalOpen(false)} className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Annuler</button>
+                                <button type="submit" className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">Créer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
