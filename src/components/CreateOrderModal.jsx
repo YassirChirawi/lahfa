@@ -17,7 +17,8 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         quantity: 1,
         amount: '',
         deliveryFee: 0,
-        status: 'Packing'
+        status: 'Packing',
+        instagram: ''
     };
 
     const [formData, setFormData] = useState(defaultState);
@@ -46,6 +47,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                     amount: initialData.amount || '',
                     deliveryFee: initialData.deliveryFee || 0,
                     status: initialData.status || 'Packing',
+                    instagram: initialData.instagram || '',
                     id: initialData.id
                 });
             } else {
@@ -172,6 +174,23 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                             placeholder="06..."
                             className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                         />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-600">Instagram (Optionnel)</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2 text-gray-400">@</span>
+                            <input
+                                type="text"
+                                name="instagram"
+                                value={formData.instagram}
+                                onChange={handleChange}
+                                placeholder="username"
+                                className="w-full border rounded-lg p-2 pl-7 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            />
+                        </div>
                     </div>
                 </div>
 

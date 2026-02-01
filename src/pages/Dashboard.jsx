@@ -4,7 +4,7 @@ import KPICard from '../components/KPICard';
 import { DollarSign, ShoppingBag, TrendingUp, Users, Activity, FileText } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import '../styles/orders.css';
-import WhatsAppPreviewModal from '../components/WhatsAppPreviewModal';
+import MessagePreviewModal from '../components/MessagePreviewModal';
 
 const Dashboard = () => {
     const { orders, updateOrderStatus } = useOrders();
@@ -57,7 +57,7 @@ const Dashboard = () => {
 
     return (
         <div>
-            <WhatsAppPreviewModal
+            <MessagePreviewModal
                 isOpen={isWhatsAppModalOpen}
                 onClose={() => setIsWhatsAppModalOpen(false)}
                 order={whatsappOrder}

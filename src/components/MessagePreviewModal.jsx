@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, MessageSquare, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Send, MessageSquare, Edit2, ChevronDown, ChevronUp, Instagram, Copy, ExternalLink, Check } from 'lucide-react';
 import { getWhatsappMessage } from '../utils/whatsappUtils';
+import { toast } from 'react-hot-toast';
 
-const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) => {
+const MessagePreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) => {
     const [language, setLanguage] = useState(initialLang);
     const [message, setMessage] = useState('');
+    const [activeTab, setActiveTab] = useState('whatsapp'); // 'whatsapp' or 'instagram'
     const [showPersonalization, setShowPersonalization] = useState(true);
+    const [copied, setCopied] = useState(false);
 
     // Personalization State
     const [vars, setVars] = useState({
@@ -14,7 +17,8 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
         address: '',
         phone: '',
         product: '',
-        price: ''
+        price: '',
+        instagram: ''
     });
 
     // Initialize when order changes
@@ -33,8 +37,16 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                 address: order.address || '',
                 phone: order.phone || '', // Editable phone only for display placeholder or logic? Mainly for message.
                 product: productName,
-                price: order.amount ? order.amount.toFixed(2) : ''
+                price: order.amount ? order.amount.toFixed(2) : '',
+                instagram: order.instagram || ''
             });
+
+            // Auto-switch tab if no phone but instagram exists?
+            if (!order.phone && order.instagram) {
+                setActiveTab('instagram');
+            } else {
+                setActiveTab('whatsapp');
+            }
         }
     }, [order, initialLang, isOpen]);
 
@@ -53,13 +65,15 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
         }
     }, [order, language, vars]);
 
-
     if (!isOpen || !order) return null;
 
-    const handleSend = () => {
+    const handleSendWhatsApp = () => {
         // Use the phone number from the input state if valid, otherwise fallback to order phone
         let phoneToUse = vars.phone || order.phone;
-        if (!phoneToUse) return;
+        if (!phoneToUse) {
+            toast.error("Numéro de téléphone manquant");
+            return;
+        }
 
         // Clean phone number
         let phone = phoneToUse.replace(/[\s\-\(\)]/g, '');
@@ -68,20 +82,35 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
         else if (phone.startsWith('0') && phone.length > 9) phone = '212' + phone.substring(1);
 
         const text = encodeURIComponent(message);
-
-        // Check if mobile device
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
         let url;
         if (isMobile) {
-            // Mobile: Use standard wa.me or API link which opens app deeply
             url = `https://wa.me/${phone}?text=${text}`;
         } else {
-            // Desktop: Force WhatsApp Web interface directly (skips landing page)
             url = `https://web.whatsapp.com/send?phone=${phone}&text=${text}`;
         }
 
         window.open(url, '_blank');
+        onClose();
+    };
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(message);
+        setCopied(true);
+        toast.success("Message copié !");
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleOpenInstagram = () => {
+        handleCopy();
+        // If username exists, open profile directly
+        if (vars.instagram) {
+            let info = vars.instagram.replace('@', '').trim();
+            window.open(`https://www.instagram.com/${info}/`, '_blank');
+        } else {
+            // Otherwise just open Instagram
+            window.open(`https://www.instagram.com/`, '_blank');
+        }
         onClose();
     };
 
@@ -91,16 +120,38 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                 {/* Header */}
                 <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                     <div className="flex items-center gap-2">
-                        <div className="bg-green-100 p-2 rounded-full text-green-600">
-                            <MessageSquare size={20} />
-                        </div>
+                        {activeTab === 'whatsapp' ? (
+                            <div className="bg-green-100 p-2 rounded-full text-green-600 transition-colors duration-300">
+                                <MessageSquare size={20} />
+                            </div>
+                        ) : (
+                            <div className="bg-pink-100 p-2 rounded-full text-pink-600 transition-colors duration-300">
+                                <Instagram size={20} />
+                            </div>
+                        )}
                         <div>
-                            <h3 className="font-bold text-gray-900">Message WhatsApp</h3>
+                            <h3 className="font-bold text-gray-900">Envoyer un message</h3>
                             <p className="text-xs text-gray-500">Pour {vars.clientName || 'Client'}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-200 transition">
                         <X size={20} />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b">
+                    <button
+                        className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'whatsapp' ? 'border-b-2 border-green-500 text-green-600 bg-green-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
+                        onClick={() => setActiveTab('whatsapp')}
+                    >
+                        <MessageSquare size={16} /> WhatsApp
+                    </button>
+                    <button
+                        className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'instagram' ? 'border-b-2 border-pink-500 text-pink-600 bg-pink-50/30' : 'text-gray-500 hover:bg-gray-50'}`}
+                        onClick={() => setActiveTab('instagram')}
+                    >
+                        <Instagram size={16} /> Instagram
                     </button>
                 </div>
 
@@ -145,7 +196,7 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                                         <input
                                             value={vars.clientName}
                                             onChange={e => setVars({ ...vars, clientName: e.target.value })}
-                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-green-500 outline-none"
+                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-indigo-500 outline-none"
                                             placeholder="Nom"
                                         />
                                     </div>
@@ -154,7 +205,7 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                                         <input
                                             value={vars.city}
                                             onChange={e => setVars({ ...vars, city: e.target.value })}
-                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-green-500 outline-none"
+                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-indigo-500 outline-none"
                                             placeholder="Ville"
                                         />
                                     </div>
@@ -163,19 +214,24 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                                         <input
                                             value={vars.price}
                                             onChange={e => setVars({ ...vars, price: e.target.value })}
-                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-green-500 outline-none"
+                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-indigo-500 outline-none"
                                             placeholder="Prix"
                                         />
                                     </div>
-                                    <div className="col-span-2">
-                                        <label className="text-[10px] uppercase text-gray-400 font-bold mb-1 block">Produit</label>
-                                        <input
-                                            value={vars.product}
-                                            onChange={e => setVars({ ...vars, product: e.target.value })}
-                                            className="w-full text-sm p-2 border rounded-lg focus:ring-1 focus:ring-green-500 outline-none"
-                                            placeholder="Nom du produit"
-                                        />
-                                    </div>
+                                    {activeTab === 'instagram' && (
+                                        <div className="col-span-2">
+                                            <label className="text-[10px] uppercase text-gray-400 font-bold mb-1 block">Instagram Username</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">@</span>
+                                                <input
+                                                    value={vars.instagram}
+                                                    onChange={e => setVars({ ...vars, instagram: e.target.value })}
+                                                    className="w-full text-sm p-2 pl-6 border rounded-lg focus:ring-1 focus:ring-pink-500 outline-none"
+                                                    placeholder="username"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -183,13 +239,22 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
 
                     {/* Editor */}
                     <div className="p-4">
-                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
-                            Message Final
-                        </label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                Message Final
+                            </label>
+                            <button
+                                onClick={handleCopy}
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                            >
+                                {copied ? <Check size={12} /> : <Copy size={12} />}
+                                {copied ? 'Copié!' : 'Copier texte'}
+                            </button>
+                        </div>
                         <textarea
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
-                            className="w-full h-48 p-4 border rounded-xl shadow-sm text-sm leading-relaxed focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none resize-none font-sans"
+                            className={`w-full h-48 p-4 border rounded-xl shadow-sm text-sm leading-relaxed focus:ring-2 focus:border-transparent outline-none resize-none font-sans transition-all ${activeTab === 'whatsapp' ? 'focus:ring-green-500' : 'focus:ring-pink-500'}`}
                             placeholder="Le message apparaîtra ici..."
                         />
                     </div>
@@ -203,17 +268,28 @@ const WhatsAppPreviewModal = ({ isOpen, onClose, order, initialLang = 'fr' }) =>
                     >
                         Annuler
                     </button>
-                    <button
-                        onClick={handleSend}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 font-medium shadow-lg shadow-green-500/20 transition transform active:scale-95"
-                    >
-                        <Send size={18} />
-                        Envoyer
-                    </button>
+
+                    {activeTab === 'whatsapp' ? (
+                        <button
+                            onClick={handleSendWhatsApp}
+                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 font-medium shadow-lg shadow-green-500/20 transition transform active:scale-95"
+                        >
+                            <Send size={18} />
+                            Envoyer WhatsApp
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleOpenInstagram}
+                            className="px-4 py-2 bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 font-medium shadow-lg shadow-pink-500/20 transition transform active:scale-95"
+                        >
+                            <Instagram size={18} />
+                            {vars.instagram ? 'Ouvrir Profil' : 'Ouvrir Instagram'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-export default WhatsAppPreviewModal;
+export default MessagePreviewModal;

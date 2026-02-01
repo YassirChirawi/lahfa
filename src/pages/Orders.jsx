@@ -8,9 +8,10 @@ import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
 import { toast } from 'react-hot-toast';
 import '../styles/orders.css';
+import '../styles/orders.css';
 import '../styles/modal.css';
 
-import WhatsAppPreviewModal from '../components/WhatsAppPreviewModal';
+import MessagePreviewModal from '../components/MessagePreviewModal';
 
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
@@ -190,7 +191,7 @@ const Orders = () => {
 
     return (
         <div className="orders-page">
-            <WhatsAppPreviewModal
+            <MessagePreviewModal
                 isOpen={isWhatsAppModalOpen}
                 onClose={() => setIsWhatsAppModalOpen(false)}
                 order={whatsappOrder}
