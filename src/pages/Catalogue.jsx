@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
-import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart } from 'lucide-react';
+import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart, Heart, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
 import CartDrawer from '../components/CartDrawer';
+import BannerCarousel from '../components/BannerCarousel';
+import DecorativeBackground from '../components/DecorativeBackground';
 
 const Catalogue = () => {
     const { products } = useProducts();
@@ -39,7 +41,24 @@ const Catalogue = () => {
             }
             return [...prev, { ...product, quantity: 1 }];
         });
-        toast.success("Ajouté au panier ! 🛒", { position: 'bottom-center' });
+
+        // Custom animated toast
+        toast.custom((t) => (
+            <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="bg-white/90 backdrop-blur-md border border-pink-200 p-4 rounded-2xl shadow-xl flex items-center gap-4"
+            >
+                <div className="bg-pink-100 p-2 rounded-full">
+                    <ShoppingBag className="text-pink-600" size={24} />
+                </div>
+                <div>
+                    <h4 className="font-bold text-gray-900">Ajouté au panier ! 💖</h4>
+                    <p className="text-sm text-gray-500">Excellent choix, ma belle !</p>
+                </div>
+            </motion.div>
+        ), { duration: 3000, position: 'bottom-center' });
     };
 
     const updateQuantity = (id, size, color, delta) => {
@@ -103,7 +122,8 @@ const Catalogue = () => {
                 style: {
                     background: '#FDF2F8',
                     color: '#DB2777',
-                    border: '1px solid #FBCFE8'
+                    border: '1px solid #FBCFE8',
+                    borderRadius: '16px'
                 }
             });
             setTimeout(() => {
@@ -113,8 +133,10 @@ const Catalogue = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans pb-20">
+        <div className="min-h-screen bg-pink-50/30 font-sans pb-20 overflow-x-hidden">
             <Toaster />
+            <DecorativeBackground />
+
             <CartDrawer
                 isOpen={isCartOpen}
                 onClose={() => setIsCartOpen(false)}
@@ -124,115 +146,128 @@ const Catalogue = () => {
             />
 
             {/* Header */}
-            <header className="bg-pink-50/80 backdrop-blur-md sticky top-0 z-10 px-4 py-6 border-b border-pink-100">
-                <div className="max-w-2xl mx-auto text-center space-y-2">
-                    <div className="inline-flex items-center justify-center gap-2 mb-1">
-                        <ShoppingBag size={24} className="text-pink-600" />
-                        <h1 className="text-3xl font-serif font-bold text-gray-900 tracking-wide">
-                            Lahfa’h <span className="text-pink-600">intimate</span> ✨
+            <header className="bg-white/70 backdrop-blur-lg sticky top-0 z-40 px-4 py-4 border-b border-pink-100 shadow-sm transition-all duration-300">
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <div className="bg-pink-100 p-2 rounded-full group-hover:bg-pink-200 transition-colors">
+                            <Sparkles size={20} className="text-pink-600" />
+                        </div>
+                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-gray-900 tracking-wide">
+                            Lahfa’h <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-600">intimate</span>
                         </h1>
                     </div>
-                </div>
 
-                {/* Active Filters Badges - Centered */}
-                <div className="hidden md:flex justify-center gap-2 mt-4">
-                    {Object.entries(filters).map(([key, value]) => {
-                        if (!value) return null;
-                        return (
-                            <span key={key} className="px-3 py-1 bg-white text-pink-600 rounded-full text-xs font-medium border border-pink-100 flex items-center gap-1 shadow-sm">
-                                <Filter size={10} /> {key}: {value}
-                            </span>
-                        )
-                    })}
+                    {/* Active Filters Badges */}
+                    <div className="flex flex-wrap justify-center gap-2">
+                        {Object.entries(filters).map(([key, value]) => {
+                            if (!value) return null;
+                            return (
+                                <span key={key} className="px-3 py-1 bg-white text-pink-600 rounded-full text-xs font-medium border border-pink-200 flex items-center gap-1 shadow-sm hover:shadow-md transition-shadow cursor-default">
+                                    <Filter size={10} /> {key}: {value}
+                                </span>
+                            )
+                        })}
+                    </div>
                 </div>
             </header>
 
             {/* Content */}
-            <main className="max-w-7xl mx-auto p-4 md:p-8">
-                {/* Mobile Filter Summary */}
-                <div className="md:hidden mb-6 flex flex-wrap gap-2 justify-center">
-                    {Object.entries(filters).map(([key, value]) => {
-                        if (!value) return null;
-                        return (
-                            <span key={key} className="px-3 py-1 bg-pink-50 text-pink-600 rounded-full text-xs font-medium border border-pink-100">
-                                {key}: {value}
-                            </span>
-                        )
-                    })}
-                </div>
+            <main className="max-w-7xl mx-auto p-4 md:p-8 relative z-10">
+                <BannerCarousel />
 
                 {filteredProducts.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                        <ShoppingBag size={64} className="mb-4 opacity-20" />
-                        <h2 className="text-xl font-semibold mb-2">Aucun produit trouvé</h2>
-                        <p>Essayez de modifier vos filtres.</p>
-                    </div>
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white/50 rounded-3xl backdrop-blur-sm border border-pink-100 mx-4"
+                    >
+                        <ShoppingBag size={64} className="mb-4 text-pink-200" />
+                        <h2 className="text-xl font-bold text-gray-600 mb-2">Oups, aucun trésor trouvé !</h2>
+                        <p className="text-pink-400">Essaie de changer tes filtres, ma belle.</p>
+                    </motion.div>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-                        {filteredProducts.map((product) => (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+                        {filteredProducts.map((product, index) => (
                             <motion.div
                                 key={product.id}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.3 }}
-                                className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: index * 0.05 }}
+                                className="group bg-white rounded-3xl shadow-sm border border-pink-50/50 hover:border-pink-200 hover:shadow-pink-100/50 hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative"
                             >
-                                {/* Image Placeholder or Real Image */}
+                                {/* Image Container */}
                                 <div
-                                    className="aspect-square bg-gray-100 relative group overflow-hidden cursor-zoom-in"
+                                    className="aspect-[4/5] bg-gray-50 relative overflow-hidden cursor-zoom-in"
                                     onClick={() => setZoomedProduct(product)}
                                 >
                                     {product.image ? (
-                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                        <img
+                                            src={product.image}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                        />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                            <ShoppingBag size={32} />
+                                        <div className="w-full h-full flex items-center justify-center text-pink-200">
+                                            <ShoppingBag size={48} />
                                         </div>
                                     )}
 
-                                    {/* Overlay Badge */}
+                                    {/* Overlay Gradient on Hover */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                                    {/* Badges */}
                                     {product.stock <= 0 ? (
                                         (product.pendingStock > 0) ? (
-                                            <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">
+                                            <div className="absolute top-3 right-3 bg-orange-400/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
                                                 Approvisionnement
                                             </div>
                                         ) : (
-                                            <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">
+                                            <div className="absolute top-3 right-3 bg-red-500/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
                                                 Épuisé
                                             </div>
                                         )
                                     ) : null}
 
-                                    {/* Zoom Hint Icon */}
-                                    <div className="absolute bottom-2 right-2 bg-black/30 p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <ZoomIn size={14} />
-                                    </div>
-                                </div>
-
-                                <div className="p-3 flex-1 flex flex-col">
-                                    <h3 className="font-bold text-gray-900 text-sm line-clamp-2 leading-tight mb-1">{product.name}</h3>
-                                    <div className="flex justify-between items-baseline mb-2">
-                                        <span className="font-bold text-pink-600 text-sm">{product.price} DH</span>
-                                        {/* Sizes/Colors simplified for compact view */}
-                                        <div className="flex gap-1 text-[10px] text-gray-500">
-                                            {product.size && <span className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-100">{product.size}</span>}
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-auto flex gap-2">
+                                    {/* Quick Actions (Appear on Hover) */}
+                                    <div className="absolute bottom-3 right-3 flex flex-col gap-2 translate-y-10 group-hover:translate-y-0 transition-transform duration-300">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); addToCart(product); }}
-                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg flex items-center justify-center gap-1 transition-colors text-xs font-bold"
+                                            onClick={(e) => { e.stopPropagation(); setZoomedProduct(product); }}
+                                            className="bg-white text-gray-800 p-2 rounded-full shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-colors"
                                         >
-                                            <Plus size={16} /> Ajouter
+                                            <ZoomIn size={18} />
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleInstagram(product); }}
-                                            className="w-10 bg-gradient-to-tr from-yellow-500 via-red-500 to-purple-600 hover:opacity-90 text-white py-2 rounded-lg flex items-center justify-center transition-opacity"
+                                            className="bg-white text-gray-800 p-2 rounded-full shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-colors"
                                         >
                                             <Instagram size={18} />
                                         </button>
                                     </div>
+                                </div>
+
+                                {/* Info */}
+                                <div className="p-4 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-bold text-gray-800 text-sm md:text-base line-clamp-1 group-hover:text-pink-600 transition-colors">{product.name}</h3>
+                                    </div>
+
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="font-extrabold text-lg text-pink-600 font-serif">{product.price} <span className="text-xs font-sans font-normal text-gray-500">DH</span></span>
+                                        <div className="flex gap-1">
+                                            {product.size && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full border border-gray-200">
+                                                    {product.size}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                                        className="mt-auto w-full bg-gray-900 group-hover:bg-pink-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 font-medium text-sm shadow-lg shadow-gray-200 group-hover:shadow-pink-200 active:scale-95"
+                                    >
+                                        <Plus size={16} /> Ajouter au panier
+                                    </button>
                                 </div>
                             </motion.div>
                         ))}
@@ -244,19 +279,21 @@ const Catalogue = () => {
             <AnimatePresence>
                 {cart.length > 0 && (
                     <motion.button
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
+                        initial={{ scale: 0, opacity: 0, y: 100 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0, opacity: 0, y: 100 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setIsCartOpen(true)}
-                        className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 z-30 hover:bg-black transition-colors"
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-30 border border-gray-800 hover:bg-black transition-colors ring-4 ring-pink-500/20"
                     >
                         <div className="relative">
-                            <ShoppingCart size={20} />
-                            <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                            <ShoppingCart size={20} className="text-pink-300" />
+                            <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-gray-900">
                                 {cart.reduce((acc, item) => acc + item.quantity, 0)}
                             </span>
                         </div>
-                        <span className="font-bold text-sm">Voir mon panier</span>
+                        <span className="font-bold text-sm tracking-wide">Mon Panier 🛍️</span>
                     </motion.button>
                 )}
             </AnimatePresence>
@@ -269,38 +306,53 @@ const Catalogue = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setZoomedProduct(null)}
-                        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
                     >
-                        <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                            <button
-                                onClick={() => setZoomedProduct(null)}
-                                className="absolute -top-12 right-0 text-white/80 hover:text-white p-2"
-                            >
-                                <X size={32} />
-                            </button>
-
-                            <img
-                                src={zoomedProduct.image}
-                                alt={zoomedProduct.name}
-                                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl bg-black"
+                        <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                transition={{ type: "spring", damping: 20 }}
+                                className="relative bg-white p-2 rounded-2xl shadow-2xl overflow-hidden"
                                 onClick={(e) => e.stopPropagation()}
-                            />
-
-                            <div className="mt-4 text-center">
-                                <h3 className="text-white text-xl font-bold">{zoomedProduct.name}</h3>
-                                <p className="text-pink-400 font-medium text-lg">{zoomedProduct.price} DH</p>
+                            >
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        addToCart(zoomedProduct);
-                                        setZoomedProduct(null);
-                                        setIsCartOpen(true);
-                                    }}
-                                    className="mt-4 bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto"
+                                    onClick={() => setZoomedProduct(null)}
+                                    className="absolute top-4 right-4 z-10 bg-black/20 hover:bg-black/40 text-white p-2 rounded-full backdrop-blur-sm transition-colors"
                                 >
-                                    <Plus size={18} /> Ajouter au panier
+                                    <X size={24} />
                                 </button>
-                            </div>
+
+                                <img
+                                    src={zoomedProduct.image}
+                                    alt={zoomedProduct.name}
+                                    className="max-w-full max-h-[70vh] object-contain rounded-xl bg-gray-50"
+                                />
+
+                                <div className="p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-1 font-serif">{zoomedProduct.name}</h3>
+                                    <p className="text-pink-600 font-bold text-xl mb-4">{zoomedProduct.price} DH</p>
+
+                                    <div className="flex gap-3 justify-center">
+                                        <button
+                                            onClick={() => {
+                                                addToCart(zoomedProduct);
+                                                setZoomedProduct(null);
+                                            }}
+                                            className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95"
+                                        >
+                                            <ShoppingBag size={18} /> Ajouter
+                                        </button>
+                                        <button
+                                            onClick={() => handleInstagram(zoomedProduct)}
+                                            className="bg-pink-100 text-pink-600 px-4 py-3 rounded-full font-bold hover:bg-pink-200 transition-colors"
+                                        >
+                                            <Instagram size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
                         </div>
                     </motion.div>
                 )}
