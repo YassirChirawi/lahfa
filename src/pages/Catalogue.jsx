@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
-import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart, Heart, Sparkles } from 'lucide-react';
+import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart, Heart, Sparkles, Phone, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
 import CartDrawer from '../components/CartDrawer';
@@ -146,34 +146,56 @@ const Catalogue = () => {
             />
 
             {/* Header */}
-            <header className="bg-white/70 backdrop-blur-lg sticky top-0 z-40 px-4 py-4 border-b border-pink-100 shadow-sm transition-all duration-300">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-                        <div className="bg-pink-100 p-2 rounded-full group-hover:bg-pink-200 transition-colors">
-                            <Sparkles size={20} className="text-pink-600" />
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-gray-900 tracking-wide">
-                            Lahfa’h <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-600">intimate</span>
-                        </h1>
+            {/* Header - Professional Layout */}
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 transition-all duration-300 h-20">
+                <div className="max-w-7xl mx-auto px-4 h-full grid grid-cols-[auto_1fr_auto] items-center gap-4 md:gap-8">
+
+                    {/* Left: Logo */}
+                    <div className="flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <img
+                            src="/logo.jpg"
+                            alt="Lahfa"
+                            className="h-8 md:h-12 w-auto object-contain mix-blend-multiply"
+                        />
                     </div>
 
-                    {/* Active Filters Badges */}
-                    <div className="flex flex-wrap justify-center gap-2">
-                        {Object.entries(filters).map(([key, value]) => {
-                            if (!value) return null;
-                            return (
-                                <span key={key} className="px-3 py-1 bg-white text-pink-600 rounded-full text-xs font-medium border border-pink-200 flex items-center gap-1 shadow-sm hover:shadow-md transition-shadow cursor-default">
-                                    <Filter size={10} /> {key}: {value}
+                    {/* Center: Minimal Banner */}
+                    <div className="hidden md:flex justify-center items-center h-full border-x border-dashed border-gray-100 px-8">
+                        <BannerCarousel />
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-4 justify-end">
+                        {/* Mobile Filter Toggle */}
+                        <button
+                            className="md:hidden p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <Filter size={20} />
+                        </button>
+
+                        <button
+                            className="relative p-2 text-gray-800 hover:text-pink-600 transition-colors group"
+                            onClick={() => setIsCartOpen(true)}
+                        >
+                            <ShoppingBag size={22} strokeWidth={1.5} />
+                            {cart.length > 0 && (
+                                <span className="absolute top-0 right-0 bg-black text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                    {cart.length}
                                 </span>
-                            )
-                        })}
+                            )}
+                        </button>
                     </div>
                 </div>
             </header>
 
+            {/* Mobile Banner (Below Header) */}
+            <div className="md:hidden bg-pink-50/50 border-b border-pink-100 py-3 px-4">
+                <BannerCarousel />
+            </div>
+
             {/* Content */}
             <main className="max-w-7xl mx-auto p-4 md:p-8 relative z-10">
-                <BannerCarousel />
 
                 {filteredProducts.length === 0 ? (
                     <motion.div
@@ -274,6 +296,55 @@ const Catalogue = () => {
                     </div>
                 )}
             </main>
+
+            {/* Footer */}
+            <footer className="bg-white border-t border-pink-100 py-12 relative z-10 mt-auto">
+                <div className="max-w-7xl mx-auto px-4 flex flex-col items-center text-center gap-6">
+
+                    {/* Logo (Grayscale/Muted) */}
+                    <img src="/logo.jpg" alt="Lahfa" className="h-10 w-auto object-contain grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-500" />
+
+                    {/* Tagline */}
+                    <p className="text-pink-400 font-serif italic text-lg">
+                        "Des pièces délicates pour sublimer votre féminité 🎀"
+                    </p>
+
+                    {/* Socials & Contact */}
+                    <div className="flex gap-4">
+                        <a
+                            href="https://www.instagram.com/lahfa_intimate/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-pink-50 text-pink-600 p-3 rounded-full hover:bg-pink-600 hover:text-white transition-all duration-300 shadow-sm"
+                            title="Instagram"
+                        >
+                            <Instagram size={20} />
+                        </a>
+                        <a
+                            href="https://wa.me/212691924932"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-green-50 text-green-600 p-3 rounded-full hover:bg-green-600 hover:text-white transition-all duration-300 shadow-sm"
+                            title="WhatsApp"
+                        >
+                            <Phone size={20} />
+                        </a>
+                        <a
+                            href="mailto:lahfaintimate@gmail.com"
+                            className="bg-blue-50 text-blue-600 p-3 rounded-full hover:bg-blue-600 hover:text-white transition-all duration-300 shadow-sm"
+                            title="Email"
+                        >
+                            <Mail size={20} />
+                        </a>
+                    </div>
+
+                    {/* Copyright */}
+                    <div className="text-gray-400 text-sm font-light">
+                        <p>© {new Date().getFullYear()} Lahfa Intimate. Tous droits réservés.</p>
+                        <p className="text-[10px] mt-1">Fait avec amour & élégance.</p>
+                    </div>
+                </div>
+            </footer>
 
             {/* Floating Cart Button (FAB) */}
             <AnimatePresence>
