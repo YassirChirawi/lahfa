@@ -6,13 +6,11 @@ let cachedToken = null;
 let tokenExpiration = null;
 
 // Helper to determine base URL
-const getBaseUrl = (settingsUrl) => {
-    // If usage via proxy is needed (development)
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return '/api/olivraison';
-    }
-    // Production / Settings override
-    return settingsUrl || 'https://partners.olivraison.com';
+const getBaseUrl = () => {
+    // Always use the proxy path.
+    // In dev: handled by Vite proxy
+    // In prod: handled by Vercel rewrites
+    return '/api/olivraison';
 };
 
 /**

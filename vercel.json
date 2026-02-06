@@ -1,6 +1,10 @@
 {
     "rewrites": [
         {
+            "source": "/api/olivraison/:match*",
+            "destination": "https://partners.olivraison.com/:match*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
