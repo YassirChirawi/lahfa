@@ -74,7 +74,8 @@ const useOrderPolling = () => {
         const intervalId = setInterval(checkStatuses, POLL_INTERVAL);
 
         // Initial check after 5 seconds to catch updates on load (optional, maybe skip to avoid spam)
-        // setTimeout(checkStatuses, 5000);
+        // Initial check after 1 second to catch updates on load
+        setTimeout(checkStatuses, 1000);
 
         return () => clearInterval(intervalId);
     }, []); // Empty dependency array to run effect once (using ref for orders)
