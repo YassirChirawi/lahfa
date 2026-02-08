@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { PromotionsProvider } from './hooks/usePromotions';
 import MainLayout from './layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import { OrderProvider } from './context/OrderContext';
@@ -60,17 +61,19 @@ function App() {
   return (
     <BrowserRouter>
       <SecurityProvider>
-        <ClientProvider>
-          <ProductProvider>
-            <CollectionProvider>
-              <OrderProvider>
-                <ExpenseProvider>
-                  <AppContent />
-                </ExpenseProvider>
-              </OrderProvider>
-            </CollectionProvider>
-          </ProductProvider>
-        </ClientProvider>
+        <PromotionsProvider>
+          <ClientProvider>
+            <ProductProvider>
+              <CollectionProvider>
+                <OrderProvider>
+                  <ExpenseProvider>
+                    <AppContent />
+                  </ExpenseProvider>
+                </OrderProvider>
+              </CollectionProvider>
+            </ProductProvider>
+          </ClientProvider>
+        </PromotionsProvider>
       </SecurityProvider>
     </BrowserRouter>
   );

@@ -1,28 +1,36 @@
 import React, { useState, useEffect } from 'react';
+import { usePromotions } from '../hooks/usePromotions';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const banners = [
-    {
-        id: 1,
-        title: "LIVRAISON OFFERTE",
-        subtitle: "Dès 250 DH d'achats"
-    },
-    {
-        id: 2,
-        title: "NOUVELLE COLLECTION",
-        subtitle: "Intimate Elegance"
-    }
-];
-
 const BannerCarousel = () => {
+    const { promo } = usePromotions();
     const [currentIndex, setCurrentIndex] = useState(0);
+
+    const banners = [
+        {
+            id: 1,
+            title: "LIVRAISON OFFERTE",
+            subtitle: `Dès ${promo.freeDeliveryThreshold || 300} DH d'achats`
+        },
+        // Only show Promo banner if active
+        ...(promo.isActive ? [{
+            id: 2,
+            title: promo.bannerText || "OFFRE SPECIALE ❤️",
+            subtitle: promo.subtitle || (promo.type === 'bogo' ? "1 ACHETÉ = 1 OFFERT !" : (promo.value ? `-${promo.value}% SUR TOUT !` : "Profitez-en !"))
+        }] : []),
+        {
+            id: 3,
+            title: "NOUVELLE COLLECTION",
+            subtitle: "Intimate Elegance"
+        }
+    ];
 
     useEffect(() => {
         const interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % banners.length);
         }, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [banners.length]);
 
     return (
         <div className="h-full flex items-center justify-center overflow-hidden w-full">

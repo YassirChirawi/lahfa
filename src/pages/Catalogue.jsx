@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProducts } from '../context/ProductContext';
+import { usePromotions } from '../hooks/usePromotions';
 import { ShoppingBag, Filter, Instagram, X, ZoomIn, Plus, ShoppingCart, Heart, Sparkles, Phone, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
@@ -10,6 +11,7 @@ import DecorativeBackground from '../components/DecorativeBackground';
 
 const Catalogue = () => {
     const { products } = useProducts();
+    const { promo } = usePromotions();
     const [searchParams] = useSearchParams();
     const [zoomedProduct, setZoomedProduct] = useState(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -238,17 +240,27 @@ const Catalogue = () => {
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
                                     {/* Badges */}
-                                    {product.stock <= 0 ? (
-                                        (product.pendingStock > 0) ? (
-                                            <div className="absolute top-3 right-3 bg-orange-400/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
-                                                Approvisionnement
+                                    <div className="absolute top-3 right-3 flex flex-col gap-1 items-end z-10">
+                                        {/* Dynamic Global Promo Badge */}
+                                        {(product.badge || (promo.isActive && promo.badgeText)) && (
+                                            <div className="bg-pink-600/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg animate-pulse">
+                                                {product.badge || promo.badgeText}
                                             </div>
-                                        ) : (
-                                            <div className="absolute top-3 right-3 bg-red-500/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
-                                                Épuisé
-                                            </div>
-                                        )
-                                    ) : null}
+                                        )}
+
+                                        {/* Stock Status */}
+                                        {product.stock <= 0 ? (
+                                            (product.pendingStock > 0) ? (
+                                                <div className="bg-orange-400/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
+                                                    Approvisionnement
+                                                </div>
+                                            ) : (
+                                                <div className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
+                                                    Épuisé
+                                                </div>
+                                            )
+                                        ) : null}
+                                    </div>
 
                                     {/* Quick Actions (Appear on Hover) */}
                                     <div className="absolute bottom-3 right-3 flex flex-col gap-2 translate-y-10 group-hover:translate-y-0 transition-transform duration-300">

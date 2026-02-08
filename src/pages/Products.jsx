@@ -25,7 +25,9 @@ const Products = () => {
         stock: '',
         image: '',
         size: '',
-        color: ''
+        color: '',
+        category: '',
+        badge: ''
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
@@ -69,7 +71,7 @@ const Products = () => {
             setImagePreview(product.image || '');
         } else {
             setEditingProduct(null);
-            setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '' });
+            setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '', category: '', badge: '' });
             setImagePreview('');
         }
         setImageFile(null);
@@ -335,6 +337,35 @@ const Products = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
                                     <input type="text" placeholder="e.g. Blue" className="w-full p-2 border rounded-lg" value={formData.color} onChange={e => setFormData({ ...formData, color: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                    <select
+                                        className="w-full p-2 border rounded-lg"
+                                        value={formData.category}
+                                        onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                    >
+                                        <option value="">Select Category...</option>
+                                        <option value="Nuisettes">Nuisettes</option>
+                                        <option value="Pyjamas">Pyjamas</option>
+                                        <option value="Ensembles">Ensembles</option>
+                                        <option value="Robes de chambre">Robes de chambre</option>
+                                        <option value="Accessoires">Accessoires</option>
+                                        <option value="Valentine">Valentine Special ❤️</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Badge (Promo)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 1 Acheté = 2 Offerts"
+                                        className="w-full p-2 border rounded-lg"
+                                        value={formData.badge}
+                                        onChange={e => setFormData({ ...formData, badge: e.target.value })}
+                                    />
                                 </div>
                             </div>
 

@@ -1,20 +1,71 @@
 import React, { useMemo } from 'react';
+import { usePromotions } from '../hooks/usePromotions';
 import { X, Minus, Plus, Trash2, ShoppingBag, MessageCircle, ArrowRight, Instagram, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 
 const CartDrawer = ({ isOpen, onClose, cart, onUpdateQuantity, onRemove }) => {
+    const { promo } = usePromotions();
 
-    const total = useMemo(() => {
-        return cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-    }, [cart]);
+    // Promo Logic: Dynamic based on settings
+    const { finalTotal, originalTotal, discount } = useMemo(() => {
+        const subtotal = cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
+
+        if (!promo.isActive) {
+            return { finalTotal: subtotal, originalTotal: subtotal, discount: 0 };
+        }
+
+        // BOGO Logic
+        if (promo.type === 'bogo') {
+            // Flatten cart items to apply "1 Bought = 1 Free" logic on pairs
+            const allItems = cart.flatMap(item => Array(item.quantity).fill(item));
+
+            // Sort by price descending to maximize customer value
+            allItems.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+
+            let promoTotal = 0;
+            allItems.forEach((item, index) => {
+                // Even indices (0, 2, 4...) are paid. Odd indices (1, 3...) are free.
+                if (index % 2 === 0) {
+                    promoTotal += parseFloat(item.price);
+                }
+            });
+
+            return {
+                finalTotal: promoTotal,
+                originalTotal: subtotal,
+                discount: subtotal - promoTotal
+            };
+        }
+
+        // Percentage Logic
+        if (promo.type === 'percentage' && promo.value > 0) {
+            const discountAmount = (subtotal * promo.value) / 100;
+            return {
+                finalTotal: subtotal - discountAmount,
+                originalTotal: subtotal,
+                discount: discountAmount
+            };
+        }
+
+        // Default or other types
+        return { finalTotal: subtotal, originalTotal: subtotal, discount: 0 };
+
+    }, [cart, promo]);
 
     const generateMessage = () => {
-        let message = "Bonjour, je souhaite commander :\n\n";
+        const promoLabel = promo.isActive ? ` (Promo ${promo.type === 'bogo' ? '1 Acheté = 1 Offert' : '-' + promo.value + '%'} ❤️)` : '';
+        let message = `Bonjour, je souhaite commander${promoLabel} :\n\n`;
         cart.forEach(item => {
             message += `- ${item.quantity}x ${item.name} (${item.size ? item.size : 'Standard'}${item.color ? ', ' + item.color : ''}) - ${item.price} DH\n`;
         });
-        message += `\n*Total : ${total.toFixed(2)} DH*`;
+
+        if (discount > 0) {
+            message += `\nSous-total : ${originalTotal.toFixed(2)} DH`;
+            message += `\nRemise (${promo.type === 'bogo' ? '1 Acheté = 1 Offert' : '-' + promo.value + '%'}) : -${discount.toFixed(2)} DH`;
+        }
+
+        message += `\n*TOTAL : ${finalTotal.toFixed(2)} DH*`;
         return message;
     };
 
@@ -152,9 +203,23 @@ const CartDrawer = ({ isOpen, onClose, cart, onUpdateQuantity, onRemove }) => {
                         {/* Footer / Checkout */}
                         {cart.length > 0 && (
                             <div className="p-4 border-t bg-white safe-area-bottom">
+                                {/* Discount logic display */}
+                                {discount > 0 && (
+                                    <div className="mb-2 space-y-1">
+                                        <div className="flex justify-between items-center text-sm text-gray-500">
+                                            <span>Sous-total</span>
+                                            <span className="line-through">{originalTotal.toFixed(2)} DH</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm text-pink-600 font-bold">
+                                            <span>Promo ({promo.type === 'bogo' ? '1 Acheté = 1 Offert' : '-' + promo.value + '%'})</span>
+                                            <span>-{discount.toFixed(2)} DH</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex justify-between items-center mb-4">
                                     <span className="text-gray-500 font-medium">Total</span>
-                                    <span className="text-2xl font-bold text-gray-900">{total.toFixed(2)} DH</span>
+                                    <span className="text-2xl font-bold text-gray-900">{finalTotal.toFixed(2)} DH</span>
                                 </div>
                                 <div className="flex gap-3">
                                     <button
