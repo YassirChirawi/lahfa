@@ -2,7 +2,93 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useClients } from '../context/ClientContext';
 import { useProducts } from '../context/ProductContext';
-import { Search } from 'lucide-react';
+import { Search, ChevronDown, Check } from 'lucide-react';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
+const CityAutocomplete = ({ value, onChange }) => {
+    const [query, setQuery] = useState(value || '');
+    const [cities, setCities] = useState([]);
+    const [filteredCities, setFilteredCities] = useState([]);
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        setQuery(value || '');
+    }, [value]);
+
+    useEffect(() => {
+        const fetchCities = async () => {
+            try {
+                const docRef = doc(db, 'settings', 'cities');
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    setCities(snap.data().list || []);
+                }
+            } catch (e) {
+                console.error("Cities fetch error", e);
+            }
+        };
+        fetchCities();
+    }, []);
+
+    useEffect(() => {
+        if (!query) {
+            setFilteredCities([]);
+            return;
+        }
+        const filtered = cities.filter(c =>
+            c.name.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 10); // Limit results
+        setFilteredCities(filtered);
+    }, [query, cities]);
+
+    const handleSelect = (city) => {
+        setQuery(city.name);
+        onChange(city.name, city.id);
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            <input
+                type="text"
+                value={query}
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    onChange(e.target.value, null); // Reset ID if typing manual
+                    setIsOpen(true);
+                }}
+                onFocus={() => setIsOpen(true)}
+                placeholder="Chercher une ville..."
+                className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+            />
+            {isOpen && filteredCities.length > 0 && (
+                <div className="absolute z-50 w-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredCities.map(city => (
+                        <div
+                            key={city.id}
+                            className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 flex justify-between items-center"
+                            onClick={() => handleSelect(city)}
+                        >
+                            <span className="text-sm font-medium text-gray-800">{city.name}</span>
+                            <div className="text-xs text-gray-500 flex flex-col items-end">
+                                <span>{city.price} DH</span>
+                                <span className="text-[10px] text-gray-400">{city.delais}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {isOpen && query && filteredCities.length === 0 && cities.length > 0 && (
+                <div className="absolute z-50 w-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow p-3 text-xs text-gray-500">
+                    Ville personnalisée (non listée)
+                </div>
+            )}
+            {/* Backdrop to close */}
+            {isOpen && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setIsOpen(false)} />}
+        </div>
+    );
+};
 
 const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
     // Default initial state
@@ -197,14 +283,13 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium mb-1 text-gray-600">Ville</label>
-                        <input
-                            type="text"
-                            name="city"
-                            required
+                        <CityAutocomplete
                             value={formData.city}
-                            onChange={handleChange}
-                            placeholder="Ville"
-                            className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            onChange={(city, districtId) => setFormData(prev => ({
+                                ...prev,
+                                city: city,
+                                districtId: districtId || null
+                            }))}
                         />
                     </div>
                     <div className="md:col-span-2">

@@ -29,7 +29,17 @@ const useOrderPolling = () => {
             for (const order of activeOrders) {
                 try {
                     const trackingID = order.deliveryValues.trackingID;
-                    const result = await getPackageStatus(trackingID);
+                    const provider = order.deliveryValues.provider || 'olivraison'; // Default for backward compatibility
+
+                    let result;
+                    if (provider === 'sendit') {
+                        // Lazy import or assume global Sendit service availability? 
+                        // Better to import it at top. Assuming it's imported as `senditService`.
+                        const { default: senditService } = await import('../services/senditService'); // Dynamic import to avoid circular dep issues if any, or just clean
+                        result = await senditService.getPackageStatus(trackingID);
+                    } else {
+                        result = await getPackageStatus(trackingID); // olivraison
+                    }
 
                     // Check if status changed
                     // Mapping Olivraison status to local status if needed, or just notifying
@@ -37,7 +47,7 @@ const useOrderPolling = () => {
                     const newStatus = result.status;
 
                     if (newStatus && newStatus !== oldStatus) {
-                        console.log(`Order ${order.id} status changed: ${oldStatus} -> ${newStatus}`);
+                        console.log(`Order ${order.id} (${provider}) status changed: ${oldStatus} -> ${newStatus}`);
 
                         // Update local order
                         await updateOrder(order.id, {
@@ -51,7 +61,7 @@ const useOrderPolling = () => {
                         // Send Notification
                         if (Notification.permission === 'granted') {
                             new Notification(`Mise à jour Commande #${order.displayId || order.id}`, {
-                                body: `Nouveau statut: ${newStatus}`,
+                                body: `Nouveau statut (${provider}): ${newStatus}`,
                                 icon: '/pwa-192x192.png'
                             });
                         } else {

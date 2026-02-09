@@ -19,8 +19,18 @@ const getBaseUrl = () => {
 const getCredentials = async () => {
     const docRef = doc(db, SETTINGS_DOC);
     const snap = await getDoc(docRef);
-    if (!snap.exists()) throw new Error("Les paramètres API Olivraison ne sont pas configurés.");
-    return snap.data();
+    if (!snap.exists()) throw new Error("Les paramètres Olivraison ne sont pas configurés.");
+
+    const data = snap.data();
+    // Support new nested structure or legacy flat structure
+    if (data.olivraison) {
+        return data.olivraison;
+    }
+    // Legacy fallback (if apiKey is at root)
+    if (data.apiKey) {
+        return data; // returns { apiKey, secretKey, ... }
+    }
+    throw new Error("Clés API Olivraison manquantes.");
 };
 
 /**

@@ -175,19 +175,21 @@ const PromotionSettings = () => {
     );
 };
 
-const Settings = () => {
-    const [formData, setFormData] = useState({
-        apiKey: '',
-        secretKey: '',
-        baseUrl: 'https://partners.olivraison.com',
-        webhookUrl: '', // Read-only, generated example or manual input if we were doing webhooks
+const DeliverySettings = () => {
+    const [settings, setSettings] = useState({
+        olivraison: { apiKey: '', secretKey: '', active: true, baseUrl: 'https://partners.olivraison.com' },
+        sendit: { publicKey: '', secretKey: '', active: false }
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [syncingCities, setSyncingCities] = useState(false);
+    const [cityCount, setCityCount] = useState(null);
+    const [lastSync, setLastSync] = useState(null);
     const [message, setMessage] = useState(null);
 
     useEffect(() => {
         fetchSettings();
+        fetchCityStats();
     }, []);
 
     const fetchSettings = async () => {
@@ -195,133 +197,210 @@ const Settings = () => {
             const docRef = doc(db, 'settings', 'delivery');
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                setFormData({ ...formData, ...docSnap.data() });
+                const data = docSnap.data();
+                // Merge with default structure to handle migrations
+                setSettings(prev => ({
+                    olivraison: { ...prev.olivraison, ...(data.olivraison || (data.apiKey ? data : {})) },
+                    sendit: { ...prev.sendit, ...(data.sendit || {}) }
+                }));
             }
         } catch (error) {
             console.error("Error fetching settings:", error);
-            setMessage({ type: 'error', text: 'Impossible de charger les paramètres.' });
         } finally {
             setLoading(false);
         }
     };
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    const fetchCityStats = async () => {
+        try {
+            const docRef = doc(db, 'settings', 'cities');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setCityCount(data.count || 0);
+                setLastSync(data.lastSync ? new Date(data.lastSync).toLocaleDateString() : null);
+            }
+        } catch (e) { console.error("Stats error", e); }
     };
 
-    const handleSubmit = async (e) => {
+    const handleChange = (provider, field, value) => {
+        setSettings(prev => ({
+            ...prev,
+            [provider]: {
+                ...prev[provider],
+                [field]: value
+            }
+        }));
+    };
+
+    const handleSave = async (e) => {
         e.preventDefault();
         setSaving(true);
         setMessage(null);
         try {
-            await setDoc(doc(db, 'settings', 'delivery'), formData);
-            setMessage({ type: 'success', text: 'Paramètres sauvegardés avec succès !' });
+            await setDoc(doc(db, 'settings', 'delivery'), settings);
+            setMessage({ type: 'success', text: 'Paramètres sauvegardés !' });
         } catch (error) {
-            console.error("Error saving settings:", error);
-            setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde.' });
+            console.error("Error saving:", error);
+            setMessage({ type: 'error', text: 'Erreur sauvegarde.' });
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) {
-        return <div className="p-8 text-center">Chargement...</div>;
-    }
+    const handleSyncCities = async () => {
+        setSyncingCities(true);
+        setMessage(null);
+        try {
+            // Import dynamically to avoid circular deps if any, or just use standard import
+            const { getAllDistricts } = await import('../services/senditService');
 
+            // 1. Fetch from Sendit
+            const districts = await getAllDistricts();
+
+            // 2. Save to Firestore
+            // We save a metadata doc and potentially the huge list in a separate collection if it's too big,
+            // but for < 1000 cities, a single doc is fine (1MB limit). 
+            // Districts usually have id, name, price. Short data.
+            await setDoc(doc(db, 'settings', 'cities'), {
+                list: districts,
+                count: districts.length,
+                lastSync: new Date().toISOString()
+            });
+
+            setCityCount(districts.length);
+            setLastSync(new Date().toLocaleDateString());
+            setMessage({ type: 'success', text: `${districts.length} villes synchronisées avec succès !` });
+
+        } catch (error) {
+            console.error("Sync Error:", error);
+            setMessage({ type: 'error', text: "Erreur lors de la synchronisation des villes. Vérifiez les clés API." });
+        } finally {
+            setSyncingCities(false);
+        }
+    };
+
+    if (loading) return <div>Chargement...</div>;
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
+                    Configuration Livraison
+                </h2>
+            </div>
+
+            <div className="p-6 space-y-8">
+                {message && (
+                    <div className={`p-4 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                        {message.text}
+                    </div>
+                )}
+
+                {/* OLIVRAISON */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-gray-900 border-l-4 border-indigo-500 pl-3">Olivraison</h3>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 text-indigo-600 rounded"
+                                checked={settings.olivraison.active}
+                                onChange={e => handleChange('olivraison', 'active', e.target.checked)}
+                            />
+                            <span className="text-sm text-gray-600">Actif</span>
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                            type="text"
+                            placeholder="API Key"
+                            value={settings.olivraison.apiKey || ''}
+                            onChange={e => handleChange('olivraison', 'apiKey', e.target.value)}
+                            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none"
+                        />
+                        <input
+                            type="password"
+                            placeholder="Secret Key"
+                            value={settings.olivraison.secretKey || ''}
+                            onChange={e => handleChange('olivraison', 'secretKey', e.target.value)}
+                            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-gray-900 border-l-4 border-orange-500 pl-3">Sendit.ma</h3>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 text-orange-600 rounded"
+                                checked={settings.sendit.active}
+                                onChange={e => handleChange('sendit', 'active', e.target.checked)}
+                            />
+                            <span className="text-sm text-gray-600">Actif</span>
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                            type="text"
+                            placeholder="Public Key"
+                            value={settings.sendit.publicKey || ''}
+                            onChange={e => handleChange('sendit', 'publicKey', e.target.value)}
+                            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none"
+                        />
+                        <input
+                            type="password"
+                            placeholder="Secret Key"
+                            value={settings.sendit.secretKey || ''}
+                            onChange={e => handleChange('sendit', 'secretKey', e.target.value)}
+                            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none"
+                        />
+                    </div>
+
+                    {/* Sync Cities UI */}
+                    <div className="bg-orange-50 rounded-lg p-4 flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-semibold text-orange-800">Synchronisation des Villes</h4>
+                            <p className="text-xs text-orange-600 mt-1">
+                                {cityCount ? `${cityCount} villes disponibles.` : 'Aucune ville synchronisée.'}
+                                {lastSync && ` (Dernière: ${lastSync})`}
+                            </p>
+                        </div>
+                        <Button
+                            onClick={handleSyncCities}
+                            disabled={syncingCities || !settings.sendit.publicKey}
+                            variant="secondary"
+                            className="text-xs"
+                        >
+                            {syncingCities ? 'Synchro...' : 'Synchroniser Villes'}
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                    <Button onClick={handleSave} disabled={saving} icon={Save} variant="primary">
+                        {saving ? 'Sauvegarde...' : 'Enregistrer Configurations'}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Settings = () => {
     return (
         <div className="p-6 max-w-4xl mx-auto space-y-6">
             <div className="flex items-center space-x-3 mb-6">
                 <Truck className="w-8 h-8 text-primary" />
-                <h1 className="text-2xl font-bold text-gray-800">Intégration Olivraison</h1>
+                <h1 className="text-2xl font-bold text-gray-800">Paramètres Généraux</h1>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                        <Lock className="w-4 h-4" />
-                        Configuration API
-                    </h2>
-                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">Secured</span>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {message && (
-                        <div className={`p-4 rounded-lg flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                            {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                            {message.text}
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                                <input
-                                    type="text"
-                                    name="apiKey"
-                                    value={formData.apiKey}
-                                    onChange={handleChange}
-                                    placeholder="Ex: api-U2FsdGVk..."
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
-                                <input
-                                    type="password"
-                                    name="secretKey"
-                                    value={formData.secretKey}
-                                    onChange={handleChange}
-                                    placeholder="Ex: U2FsdGVkX1..."
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
-                                <input
-                                    type="text"
-                                    name="baseUrl"
-                                    value={formData.baseUrl}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed"
-                                    disabled // Usually fixed, but good to show
-                                />
-                                <p className="text-xs text-gray-500 mt-1">L'URL par défaut de l'API Olivraison.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-100 flex justify-end">
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            disabled={saving}
-                            icon={Save}
-                        >
-                            {saving ? 'Sauvegarde...' : 'Sauvegarder les clés'}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-
+            <DeliverySettings />
             <PromotionSettings />
-
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6">
-                <h3 className="text-blue-900 font-medium mb-2 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    Information Importante
-                </h3>
-                <p className="text-sm text-blue-800 leading-relaxed">
-                    Pour obtenir vos clés API, connectez-vous à votre tableau de bord <strong>Olivraison Partners</strong>.
-                    Assurez-vous de ne jamais partager votre Secret Key.
-                </p>
-            </div>
         </div>
     );
 };

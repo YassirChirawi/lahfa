@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
@@ -6,8 +6,10 @@ import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw } f
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
+import senditService from '../services/senditService';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
-import '../styles/orders.css';
 import '../styles/orders.css';
 import '../styles/modal.css';
 
@@ -31,6 +33,26 @@ const Orders = () => {
     // WhatsApp Modal State
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [whatsappOrder, setWhatsappOrder] = useState(null);
+
+    // Active Providers State
+    const [activeProviders, setActiveProviders] = useState({ olivraison: false, sendit: false });
+
+    useEffect(() => {
+        const fetchProviders = async () => {
+            try {
+                const docRef = doc(db, 'settings', 'delivery');
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    setActiveProviders({
+                        olivraison: data.olivraison?.active ?? !!data.apiKey,
+                        sendit: data.sendit?.active ?? false
+                    });
+                }
+            } catch (e) { console.error(e); }
+        };
+        fetchProviders();
+    }, []);
 
     const filteredOrders = orders.filter(order => {
         // Trash Mode: Only show deleted. Normal Mode: Only show non-deleted.
@@ -142,47 +164,76 @@ const Orders = () => {
         }
     };
 
+    const handleSendToSendit = async (order) => {
+        if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Sendit ?`)) return;
+
+        const toastId = toast.loading("Envoi vers Sendit...");
+        try {
+            const result = await senditService.createPackage(order);
+            await updateOrder(order.id, {
+                status: 'Ramassage',
+                deliveryValues: {
+                    provider: 'sendit',
+                    trackingID: result.trackingID,
+                    status: result.status || 'PENDING',
+                    sentAt: new Date().toISOString(),
+                    details: result
+                }
+            });
+            toast.success("Commande envoyée à Sendit !", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur Sendit: ${error.message}`, { id: toastId });
+        }
+    };
+
     const handleSendToDelivery = async (order) => {
         if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Olivraison ?`)) return;
 
-        const toastId = toast.loading("Envoi en cours...");
+        const toastId = toast.loading("Envoi vers Olivraison...");
         try {
             const result = await olivraisonService.createPackage(order);
             await updateOrder(order.id, {
-                status: 'Ramassage', // Default status after creating? Or keep 'Packing'? Usually implies ready to pickup
+                status: 'Ramassage',
                 deliveryValues: {
+                    provider: 'olivraison',
                     trackingID: result.trackingID,
                     status: result.status,
                     sentAt: new Date().toISOString()
                 }
             });
-            toast.success("Commande envoyée avec succès !", { id: toastId });
+            toast.success("Commande envoyée à Olivraison !", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur: ${error.message}`, { id: toastId });
+            toast.error(`Erreur Olivraison: ${error.message}`, { id: toastId });
         }
     };
 
     const handleSyncStatus = async (order) => {
         if (!order.deliveryValues?.trackingID) return;
+        const provider = order.deliveryValues.provider || 'olivraison';
 
-        const toastId = toast.loading("Synchronisation...");
+        const toastId = toast.loading(`Sync ${provider}...`);
         try {
-            const result = await olivraisonService.getPackageStatus(order.deliveryValues.trackingID);
-            // Map Olivraison status to local status if needed
-            // Example result.status: "string" -> Local mapping?
-            // For now, just update the delivery metadata and maybe the main status if it matches
+            let result;
+            let status;
+
+            if (provider === 'sendit') {
+                result = await senditService.getPackageStatus(order.deliveryValues.trackingID);
+                status = result.data?.status || result.status;
+            } else {
+                result = await olivraisonService.getPackageStatus(order.deliveryValues.trackingID);
+                status = result.status;
+            }
 
             await updateOrder(order.id, {
                 deliveryValues: {
                     ...order.deliveryValues,
-                    status: result.status,
+                    status: status,
                     lastSync: new Date().toISOString()
                 },
-                // Optional: Update main status if it makes sense (e.g. if Delivery says "Delivered", set to "Livré")
-                // status: mapDeliveryStatus(result.status) || order.status 
             });
-            toast.success(`Statut synchronisé: ${result.status}`, { id: toastId });
+            toast.success(`Statut: ${status}`, { id: toastId });
         } catch (error) {
             toast.error("Erreur de synchronisation", { id: toastId });
         }
@@ -411,18 +462,31 @@ const Orders = () => {
 
                                                         {/* Delivery Integration */}
                                                         {!order.deliveryValues?.trackingID ? (
-                                                            <button
-                                                                className="icon-btn-sm text-orange-500 hover:bg-orange-50"
-                                                                onClick={() => handleSendToDelivery(order)}
-                                                                title="Envoyer à Olivraison"
-                                                            >
-                                                                <Truck size={16} />
-                                                            </button>
+                                                            <div className="flex gap-1">
+                                                                {activeProviders.olivraison && (
+                                                                    <button
+                                                                        className="icon-btn-sm text-indigo-500 hover:bg-indigo-50"
+                                                                        onClick={() => handleSendToDelivery(order)}
+                                                                        title="Envoyer à Olivraison"
+                                                                    >
+                                                                        <Truck size={16} />
+                                                                    </button>
+                                                                )}
+                                                                {activeProviders.sendit && (
+                                                                    <button
+                                                                        className="icon-btn-sm text-orange-500 hover:bg-orange-50 font-bold"
+                                                                        onClick={() => handleSendToSendit(order)}
+                                                                        title="Envoyer à Sendit"
+                                                                    >
+                                                                        S
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         ) : (
                                                             <button
-                                                                className="icon-btn-sm text-green-600 hover:bg-green-50"
+                                                                className={`icon-btn-sm hover:bg-green-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : 'text-green-600'}`}
                                                                 onClick={() => handleSyncStatus(order)}
-                                                                title={`Suivi: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}`}
+                                                                title={`Provider: ${order.deliveryValues.provider}\nRef: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}`}
                                                             >
                                                                 <RefreshCw size={16} />
                                                             </button>
@@ -432,17 +496,18 @@ const Orders = () => {
                                                             className="icon-btn-sm text-red-500 hover:bg-red-50"
                                                             onClick={async () => {
                                                                 if (order.deliveryValues?.trackingID) {
-                                                                    if (window.confirm("Cette commande est liée à Olivraison. Voulez-vous aussi l'annuler chez Olivraison ?")) {
-                                                                        const toastId = toast.loading("Annulation chez Olivraison...");
+                                                                    if (window.confirm(`Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`)) {
+                                                                        const toastId = toast.loading("Annulation...");
                                                                         try {
-                                                                            await olivraisonService.cancelPackage(order.deliveryValues.trackingID);
-                                                                            toast.success("Annulé sur Olivraison", { id: toastId });
-                                                                        } catch (e) {
-                                                                            console.error(e);
-                                                                            toast.error("Erreur annulation Olivraison: " + e.message, { id: toastId });
-                                                                            if (!window.confirm("L'annulation a échoué. Voulez-vous quand même supprimer la commande localement ?")) {
-                                                                                return;
+                                                                            if (order.deliveryValues.provider === 'sendit') {
+                                                                                await senditService.cancelPackage(order.deliveryValues.trackingID);
+                                                                            } else {
+                                                                                await olivraisonService.cancelPackage(order.deliveryValues.trackingID);
                                                                             }
+                                                                            toast.success("Annulé !", { id: toastId });
+                                                                        } catch (e) {
+                                                                            toast.error("Erreur annulation: " + e.message, { id: toastId });
+                                                                            if (!window.confirm("Forcer la suppression locale ?")) return;
                                                                         }
                                                                     }
                                                                 }
