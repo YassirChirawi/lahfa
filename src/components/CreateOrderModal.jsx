@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useClients } from '../context/ClientContext';
 import { useProducts } from '../context/ProductContext';
-import { Search, ChevronDown, Check, Plus, Trash2, Tag } from 'lucide-react';
+import { Search, ChevronDown, Check, Plus, Trash2, Tag, Gift } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -125,25 +125,9 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
     const [productSearch, setProductSearch] = useState('');
     const [showProductSuggestions, setShowProductSuggestions] = useState(false);
 
-    // Promotion State
-    const [promotion, setPromotion] = useState(null);
+    // Manual Promotion State
+    const [isBogoActive, setIsBogoActive] = useState(false);
     const [discount, setDiscount] = useState(0);
-
-    // Effect: Fetch active promotion on mount
-    useEffect(() => {
-        const fetchPromotion = async () => {
-            try {
-                const docRef = doc(db, 'settings', 'promotions');
-                const snap = await getDoc(docRef);
-                if (snap.exists() && snap.data().isActive) {
-                    setPromotion(snap.data());
-                } else {
-                    setPromotion(null);
-                }
-            } catch (e) { console.error("Promo fetch error", e); }
-        };
-        fetchPromotion();
-    }, []);
 
     // Effect to populate form when initialData changes or modal opens
     useEffect(() => {
@@ -177,12 +161,17 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                 } else {
                     setItems([]);
                 }
+
+                // If editing, we might need to deduce protocol, but new orders default false
+                setIsBogoActive(initialData.isBogo || false);
+
             } else {
                 setFormData(defaultState);
                 setItems([]);
                 setSearchTerm('');
                 setProductSearch('');
                 setCurrentItem({ article: '', size: '', color: '', quantity: 1, price: 0 });
+                setIsBogoActive(false);
             }
         }
     }, [isOpen, initialData]);
@@ -191,29 +180,19 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
     useEffect(() => {
         let subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price || 0) * parseInt(item.quantity || 1)), 0);
         let calculatedDiscount = 0;
-        let deliveryFee = formData.deliveryFee || 0;
+        let deliveryFee = parseFloat(formData.deliveryFee) || 0;
 
-        if (promotion && promotion.isActive) {
-            if (promotion.type === 'percentage') {
-                calculatedDiscount = subtotal * (parseFloat(promotion.value) / 100);
-            } else if (promotion.type === 'bogo') {
-                // Simplified BOGO logic: If item count >= 2, deduct cheapest? 
-                // Or user implements specific BOGO logic. 
-                // For now, let's assume global BOGO isn't auto-calculated perfectly without complex rules.
-                // Or maybe just fixed discount if enabled?
-            }
-            // Free Delivery Threshold
-            if (promotion.freeDeliveryThreshold && subtotal >= promotion.freeDeliveryThreshold) {
-                // deliveryFee = 0; // Logic for free delivery if handled here
+        if (isBogoActive) {
+            // "1 acheté = 1 offert" logic: Customer pays ONLY for the first line item.
+            if (items.length > 0) {
+                const firstItemCost = parseFloat(items[0].price || 0) * parseInt(items[0].quantity || 1);
+                calculatedDiscount = subtotal - firstItemCost;
             }
         }
 
         setDiscount(calculatedDiscount);
 
-        // Update total amount in form data (visual only until save)
-        // setFormData(prev => ({ ...prev, amount: subtotal - calculatedDiscount + deliveryFee }));
-
-    }, [items, promotion, formData.deliveryFee]);
+    }, [items, isBogoActive, formData.deliveryFee]);
 
 
     const handleChange = (e) => {
@@ -289,6 +268,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
             amount: totalAmount,
             subtotal: subtotal,
             discount: discount,
+            isBogo: isBogoActive,
             // Legacy compatibility (takes first item)
             article: items[0]?.article || 'Multi-items',
             size: items[0]?.size || '',
@@ -333,15 +313,19 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                         {showSuggestions && searchTerm && (
                             <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                 {clients
-                                    .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                    .filter(c =>
+                                        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        (c.phone && c.phone.includes(searchTerm))
+                                    )
                                     .map(client => (
                                         <div
                                             key={client.id}
                                             className="p-3 hover:bg-gray-50 cursor-pointer text-sm"
                                             onClick={() => handleClientSelect(client)}
                                         >
-                                            <div className="font-medium">{client.name}</div>
+                                            <div className="font-medium text-gray-900">{client.name}</div>
                                             <div className="text-gray-500 text-xs">{client.phone}</div>
+                                            <div className="text-gray-400 text-[10px]">{client.city}</div>
                                         </div>
                                     ))}
                             </div>
@@ -548,14 +532,23 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                         <span className="font-medium">{subtotal.toFixed(2)} DH</span>
                     </div>
 
-                    {promotion && promotion.isActive && (
-                        <div className="flex justify-between text-sm text-pink-600 items-center">
-                            <span className="flex items-center gap-1">
-                                <Tag size={14} /> Promo ({promotion.type === 'percentage' ? `-${promotion.value}%` : promotion.type})
+                    {/* Manual BOGO Toggle */}
+                    <div className="flex justify-between items-center bg-pink-50 p-2 rounded border border-pink-100">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isBogoActive}
+                                onChange={(e) => setIsBogoActive(e.target.checked)}
+                                className="text-pink-600 rounded focus:ring-pink-500"
+                            />
+                            <span className="text-sm font-medium text-pink-700 flex items-center gap-1">
+                                <Gift size={15} /> 1 Acheté = 1 Offert (Pack)
                             </span>
-                            <span>- {discount.toFixed(2)} DH</span>
-                        </div>
-                    )}
+                        </label>
+                        {isBogoActive && (
+                            <span className="text-sm text-pink-600 font-bold">- {discount.toFixed(2)} DH</span>
+                        )}
+                    </div>
 
                     <div className="flex justify-between text-sm items-center">
                         <span className="text-gray-600">Livraison</span>
