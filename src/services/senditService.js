@@ -125,11 +125,11 @@ const senditService = {
             // Map to our internal format
             return allDistricts.map(d => ({
                 id: d.id,
-                name: d.name || d.ville, // Adjust based on actual API field
+                name: d.name || d.ville || "Inconnu",
                 price: parseFloat(d.price || d.tarif || 0),
                 delais: d.delais || d.delivery_time || "24h-48h",
-                ref: d.ref || d.code,
-                region: d.region
+                ref: d.ref || d.code || null,
+                region: d.region || null
             }));
 
         } catch (error) {
