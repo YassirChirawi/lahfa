@@ -376,23 +376,39 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ville Client</label>
                             <CityAutocomplete
                                 value={formData.city}
                                 onChange={handleCityChange}
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                            <input
-                                type="text"
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                required
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ville de Ramassage</label>
+                            <CityAutocomplete
+                                value={formData.deliveryValues?.pickupCity || "Casablanca"}
+                                onChange={(name, id) => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        deliveryValues: {
+                                            ...prev.deliveryValues,
+                                            pickupCity: name,
+                                            pickupDistrictId: id
+                                        }
+                                    }));
+                                }}
                             />
                         </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                        <input
+                            type="text"
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            required
+                        />
                     </div>
                 </div>
 
