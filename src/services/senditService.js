@@ -149,6 +149,32 @@ const senditService = {
                 throw new Error(`La ville "${order.city}" n'est pas reconnue par Sendit. Veuillez modifier la commande et sélectionner une ville valide dans la liste déroulante.`);
             }
 
+            // 1b. Resolve Pickup District ID
+            let pickupId = (await getCredentials()).pickup_district_id;
+
+            if (!pickupId) {
+                try {
+                    // Auto-detect Casablanca
+                    if (!cachedDistricts) cachedDistricts = await senditService.getAllDistricts();
+                    const casa = cachedDistricts.find(d => d.name.toLowerCase() === "casablanca");
+                    if (casa) {
+                        pickupId = casa.id;
+                        console.log("Auto-detected Pickup City: Casablanca (ID:", pickupId, ")");
+                    }
+                } catch (e) {
+                    console.warn("Could not auto-detect pickup city:", e);
+                }
+            }
+
+            if (!pickupId) {
+                // Hard fallback for Casablanca if fetch fails ? Or throw.
+                // Let's assume 121 is Casablanca for Sendit (common), 
+                // but safer to throw if not found to avoid wrong city.
+                // However user said "toujours casablanca". 
+                // If API fails, we are stuck.
+                throw new Error("Impossible de déterminer l'ID de Casablanca (Pickup). Veuillez vérifier votre connexion ou les paramètres.");
+            }
+
             // 2. Prepare Product String (Robust Fallback)
             let productsString = "";
             if (order.items && order.items.length > 0) {
