@@ -1,12 +1,25 @@
-import toast from 'react-hot-toast';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
+const SETTINGS_DOC = 'settings/delivery';
 const API_BASE_URL = 'https://app.sendit.ma/api/v1';
-const PUBLIC_KEY = '0976d72064c9cc2c5641eb7c3e00c9e7';
-const SECRET_KEY = '26wUl1qdHqPuNPhhw2gH1hJwDLSNgEm0';
 
 let cachedToken = null;
 let tokenExpiration = null;
 let cachedDistricts = null;
+
+// Helper to fetch credentials from Firestore
+const getCredentials = async () => {
+    const docRef = doc(db, SETTINGS_DOC);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) throw new Error("Les paramètres de livraison ne sont pas configurés.");
+
+    const data = snap.data();
+    if (!data.sendit || !data.sendit.publicKey || !data.sendit.secretKey) {
+        throw new Error("Clés API Sendit manquantes. Configurez-les dans les paramètres.");
+    }
+    return data.sendit;
+};
 
 const senditService = {
     /**
@@ -19,6 +32,8 @@ const senditService = {
         }
 
         try {
+            const { publicKey, secretKey } = await getCredentials();
+
             console.log("Authenticating with Sendit...");
             const response = await fetch(`${API_BASE_URL}/login`, {
                 method: 'POST',
@@ -27,8 +42,8 @@ const senditService = {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    public_key: PUBLIC_KEY,
-                    secret_key: SECRET_KEY
+                    public_key: publicKey,
+                    secret_key: secretKey
                 })
             });
 
@@ -38,23 +53,16 @@ const senditService = {
             }
 
             const data = await response.json();
-
-            // Assuming response structure based on docs definition of LoginSuccessResponse
-            // Often it's { token: "...", expires_in: ... } or similar. 
-            // Docs say: 200 -> LoginSuccessResponse. Let's inspect data if possible, but standard is usually 'token' or 'access_token'
-            // I'll assume 'token' based on typical matching logic, will debug if wrong.
-            // Actually, let's log the auth response to be sure during first run
             console.log("Sendit Auth Response:", data);
 
             if (!data.token && !data.access_token) {
-                // Try looking in data.data or similar wrappers if needed
                 if (data.data?.token) cachedToken = data.data.token;
                 else throw new Error("Token not found in response");
             } else {
                 cachedToken = data.token || data.access_token;
             }
 
-            // Set expiration (e.g., 23 hours to be safe)
+            // Set expiration (e.g., 23 hours)
             tokenExpiration = new Date(new Date().getTime() + 23 * 60 * 60 * 1000);
             return cachedToken;
         } catch (error) {
@@ -64,56 +72,69 @@ const senditService = {
     },
 
     /**
-     * Get list of districts (Cities)
-     * Used to map text city to district_id
+     * Get ALL districts (Cities) with prices and delays
+     * Used for syncing city data
      */
-    getDistricts: async () => {
-        if (cachedDistricts) return cachedDistricts;
-
+    getAllDistricts: async () => {
         try {
             const token = await senditService.getToken();
-            // Fetch all pages? Or just search?
-            // For mapping, we ideally need a full list or we can search by query.
-            // Let's try fetching page 1 and see total, or just search when needed. 
-            // Searching per order might be slower but safer if list is huge.
-            // Let's try searching first since we have a 'querystring' param.
-            return []; // Placeholder if we use search-on-demand
-        } catch (error) {
-            console.error("Get Districts Error:", error);
-            return [];
-        }
-    },
 
-    /**
-     * Find district ID by name
-     */
-    findDistrictId: async (cityName) => {
-        if (!cityName) return null;
-        try {
-            const token = await senditService.getToken();
-            const response = await fetch(`${API_BASE_URL}/districts?querystring=${encodeURIComponent(cityName)}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
+            // Sendit doesn't seem to have a strict "list all" without pagination documented clearly locally,
+            // but usually /districts works. If paginated, we might need loop.
+            // Documentation says: GET /districts with optional querystring.
+            // Let's assume initially it returns a list or we can fetch a large page?
+            // If pagination is mandatory, we might need to iterate.
+            // Let's try fetching page 1 and see.
+
+            let allDistricts = [];
+            let page = 1;
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetch(`${API_BASE_URL}/districts?page=${page}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) break;
+                const result = await response.json();
+
+                // Expected format: { success: true, data: [...] } or { data: [...], meta: ... }
+                // Based on common Laravel/API styles.
+                const districts = result.data || [];
+
+                if (districts.length === 0) {
+                    hasMore = false;
+                } else {
+                    allDistricts = [...allDistricts, ...districts];
+                    // Check if we reached last page?
+                    // If result.meta exists? 
+                    // Or if districts.length < per_page?
+                    // Let's assume for safety we limit to reasonable pages or stop if empty.
+                    if (districts.length < 15) hasMore = false; // Assuming default pagination 15
+                    else page++;
                 }
-            });
 
-            if (!response.ok) return null;
-            const result = await response.json();
-
-            // Expected: { success: true, data: [ { id: 1, ville: "...", name: "..." } ] }
-            if (result.success && result.data && result.data.length > 0) {
-                // Try to find exact match or best match
-                // API might return "Casablanca - Maarif" for query "Casablanca"
-                // We prefer a generic city ID if available, otherwise the first one?
-                // Let's just take the first one for now or look for one where ville == name?
-                return result.data[0].id;
+                // Safety break
+                if (page > 20) hasMore = false;
             }
-            return null;
+
+            // Map to our internal format
+            return allDistricts.map(d => ({
+                id: d.id,
+                name: d.name || d.ville, // Adjust based on actual API field
+                price: parseFloat(d.price || d.tarif || 0),
+                delais: d.delais || d.delivery_time || "24h-48h",
+                ref: d.ref || d.code,
+                region: d.region
+            }));
+
         } catch (error) {
-            console.error("Find District Error:", error);
-            return null;
+            console.error("Get All Districts Error:", error);
+            throw error;
         }
     },
 
@@ -124,26 +145,20 @@ const senditService = {
         try {
             const token = await senditService.getToken();
 
-            // 1. Resolve District ID
-            let districtId = await senditService.findDistrictId(order.city);
-            if (!districtId) {
-                // Fallback: Default to Casablanca or throw error?
-                // Let's throw for now to let user fix address
-                throw new Error(`Ville non trouvée chez Sendit: ${order.city}`);
+            // 1. Resolve District ID if not already present
+            let districtId = order.deliveryValues?.districtId; // If selected via dropdown
+
+            // If coming from old order or manual entry, try to find it
+            if (!districtId && order.city) {
+                // We could implement search here, but ideally UI handles it.
+                // For now, throw if missing?
+                throw new Error(`ID de ville manquant pour ${order.city}. Veuillez modifier la commande et sélectionner une ville dans la liste.`);
             }
 
-            // 2. Prepare Product String "CODE:QTY;CODE2:QTY"
-            // If items have no code, maybe we need to create dummy codes or ignore?
-            // Docs say: "Si vous n'avez pas de stock, vous pouvez laisser ce champ vide ou le remplir avec les informations de vos produits."
-            // So we can send text description? "Liste des produits ... au format code:qty" implies structure.
-            // But detailed description says: "Si vous n'avez pas de stock... laisser vide ou remplir avec infos".
-            // Let's try sending a descriptive string if no codes, or just "GENERIC:1".
-            // Actually, let's construct a meaningful string if possible.
+            // 2. Prepare Product String
             let productsString = "";
             if (order.items && order.items.length > 0) {
                 productsString = order.items.map(item => {
-                    // Use item.id or item.article as code? Code must probably be short and no special chars?
-                    // Let's try using a sanitized name or ID.
                     const code = (item.article || "ITEM").replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
                     return `${code}:${item.quantity || 1}`;
                 }).join(';');
@@ -152,18 +167,15 @@ const senditService = {
             }
 
             // 3. Construct Payload
-            // Required: products, district_id, name, phone, address
             const payload = {
                 district_id: parseInt(districtId),
                 name: order.customer || "Client",
                 phone: order.phone || "",
                 address: order.address || order.city || "Adresse",
                 amount: parseFloat(order.amount) || 0,
-                comment: order.notes || "",
+                note: order.notes || "",
                 products: productsString,
-                allow_open: 1, // Default to allow open
-                allow_try: 1,  // Default to allow try
-                products_from_stock: 0 // Default to 0 as we likely don't sync stock yet
+                // Add other default flags if needed
             };
 
             console.log("Creating Sendit Package:", payload);
@@ -181,19 +193,18 @@ const senditService = {
             const result = await response.json();
 
             if (!response.ok) {
-                console.error("Sendit Create Error Response:", result);
+                console.error("Sendit Create Error:", result);
                 throw new Error(result.message || "Erreur lors de la création du colis Sendit");
             }
 
-            // Success response: { success: true, data: { ... } }
-            // We need the tracking ID. Usually in data.code or data.id?
-            // "NewColisDetail" schema references "ColisDetailData".
-            // Let's assume result.data.code is the tracking ID based on "deliveries/{code}" paths.
+            // Success. We need tracking ID.
+            // Assuming result.code or result.data.code
+            const trackingCode = result.code || result.data?.code;
 
             return {
-                trackingID: result.data.code,
-                status: result.data.status,
-                trackingUrl: result.data.labelUrl // Maybe?
+                trackingID: trackingCode,
+                status: result.status || result.data?.status || 'PENDING',
+                trackingUrl: result.label_url || result.data?.label_url
             };
 
         } catch (error) {
@@ -221,11 +232,11 @@ const senditService = {
             }
 
             const result = await response.json();
-            // Result schema: { success: true, data: { status: "...", ... } }
 
+            // Expected: { code: "...", status: "...", ... }
             return {
-                status: result.data.status,
-                raw: result.data
+                status: result.status || result.data?.status,
+                raw: result
             };
         } catch (error) {
             console.error("Sendit Get Status Error:", error);
@@ -239,6 +250,7 @@ const senditService = {
     cancelPackage: async (trackingID) => {
         try {
             const token = await senditService.getToken();
+            // Check API docs for cancel endpoint. Often DELETE /deliveries/{code}
             const response = await fetch(`${API_BASE_URL}/deliveries/${trackingID}`, {
                 method: 'DELETE',
                 headers: {
@@ -248,7 +260,7 @@ const senditService = {
             });
 
             if (!response.ok) {
-                if (response.status === 404) return true; // Already gone
+                if (response.status === 404) return true;
                 throw new Error("Impossible d'annuler le colis Sendit");
             }
             return true;
@@ -259,4 +271,5 @@ const senditService = {
     }
 };
 
+export const getAllDistricts = senditService.getAllDistricts;
 export default senditService;
