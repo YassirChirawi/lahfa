@@ -138,21 +138,21 @@ const senditService = {
         try {
             const token = await senditService.getToken();
 
-            // 1. Resolve District ID if not already present
-            let districtId = order.deliveryValues?.districtId; // If selected via dropdown
+            // 1. Resolve District ID with Strict Validation
+            let districtId = order.deliveryValues?.districtId;
 
-            // If coming from old order or manual entry, try to find it
-            if (!districtId && order.city) {
-                // We could implement search here, but ideally UI handles it.
-                // For now, throw if missing?
-                throw new Error(`ID de ville manquant pour ${order.city}. Veuillez modifier la commande et sélectionner une ville dans la liste.`);
+            if (!districtId || isNaN(parseInt(districtId))) {
+                console.error("Missing/Invalid District ID for city:", order.city);
+                throw new Error(`La ville "${order.city}" n'est pas reconnue par Sendit. Veuillez modifier la commande et sélectionner une ville valide dans la liste déroulante.`);
             }
 
-            // 2. Prepare Product String
+            // 2. Prepare Product String (Robust Fallback)
             let productsString = "";
             if (order.items && order.items.length > 0) {
                 productsString = order.items.map(item => {
-                    const code = (item.article || "ITEM").replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+                    let cleanName = (item.article || "ITEM").replace(/[^a-zA-Z0-9]/g, '');
+                    if (!cleanName) cleanName = "ITEM";
+                    const code = cleanName.substring(0, 10).toUpperCase();
                     return `${code}:${item.quantity || 1}`;
                 }).join(';');
             } else {
@@ -164,12 +164,17 @@ const senditService = {
                 district_id: parseInt(districtId),
                 name: order.customer || "Client",
                 phone: order.phone || "",
-                address: order.address || order.city || "Adresse",
+                address: order.address || order.city || "Adresse inconnue",
                 amount: parseFloat(order.amount) || 0,
                 note: order.notes || "",
                 products: productsString,
-                // Add other default flags if needed
+                // Options d'essayage et d'échange
+                is_try: order.deliveryValues?.allowTry ? 1 : 0,
+                is_open: order.deliveryValues?.allowOpen ? 1 : 0, // Certain APIs use is_open
+                is_exchange: order.deliveryValues?.isExchange ? 1 : 0,
             };
+
+            console.log("🚀 Payload Sendit:", JSON.stringify(payload, null, 2));
 
             console.log("Creating Sendit Package:", payload);
 

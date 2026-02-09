@@ -101,7 +101,12 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         instagram: '',
         amount: 0,
         deliveryFee: 0,
-        deliveryValues: {}, // Sendit/Olivraison data
+        deliveryFee: 0,
+        deliveryValues: {
+            allowTry: false,
+            allowOpen: false,
+            isExchange: false
+        }, // Sendit/Olivraison data
     };
 
     const [formData, setFormData] = useState(defaultState);
@@ -253,6 +258,18 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
             }
         }));
     };
+
+    const handleDeliveryOptionChange = (option) => {
+        setFormData(prev => ({
+            ...prev,
+            deliveryValues: {
+                ...prev.deliveryValues,
+                [option]: !prev.deliveryValues?.[option]
+            }
+        }));
+    };
+
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -564,6 +581,28 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                     <div className="flex justify-between text-base font-bold border-t pt-2 mt-2">
                         <span>Total</span>
                         <span className="text-indigo-600">{finalTotal.toFixed(2)} DH</span>
+                    </div>
+
+                    {/* Delivery Options */}
+                    <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-gray-100">
+                        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.deliveryValues?.allowTry || false}
+                                onChange={() => handleDeliveryOptionChange('allowTry')}
+                                className="rounded text-indigo-600 focus:ring-indigo-500"
+                            />
+                            Autoriser l'essayage
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.deliveryValues?.isExchange || false}
+                                onChange={() => handleDeliveryOptionChange('isExchange')}
+                                className="rounded text-orange-500 focus:ring-orange-500"
+                            />
+                            Échange
+                        </label>
                     </div>
                 </div>
 
