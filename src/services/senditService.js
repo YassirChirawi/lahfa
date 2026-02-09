@@ -18,7 +18,10 @@ const getCredentials = async () => {
     if (!data.sendit || !data.sendit.publicKey || !data.sendit.secretKey) {
         throw new Error("Clés API Sendit manquantes. Configurez-les dans les paramètres.");
     }
-    return data.sendit;
+    return {
+        ...data.sendit,
+        pickup_district_id: data.sendit.pickup_district_id
+    };
 };
 
 const senditService = {
@@ -162,6 +165,7 @@ const senditService = {
             // 3. Construct Payload
             const payload = {
                 district_id: parseInt(districtId),
+                pickup_district_id: parseInt(pickupId),
                 name: order.customer || "Client",
                 phone: order.phone || "",
                 address: order.address || order.city || "Adresse inconnue",
@@ -192,7 +196,13 @@ const senditService = {
 
             if (!response.ok) {
                 console.error("Sendit Create Error:", result);
-                throw new Error(result.message || "Erreur lors de la création du colis Sendit");
+                let errorMessage = result.message || "Erreur lors de la création du colis Sendit";
+                if (result.errors) {
+                    // Laravel style validation errors
+                    const details = Object.entries(result.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+                    errorMessage = `${errorMessage} \n Détails: ${details}`;
+                }
+                throw new Error(errorMessage);
             }
 
             // Success. We need tracking ID.
