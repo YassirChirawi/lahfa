@@ -102,24 +102,17 @@ const senditService = {
                 if (!response.ok) break;
                 const result = await response.json();
 
-                // Expected format: { success: true, data: [...] } or { data: [...], meta: ... }
-                // Based on common Laravel/API styles.
                 const districts = result.data || [];
 
                 if (districts.length === 0) {
                     hasMore = false;
                 } else {
                     allDistricts = [...allDistricts, ...districts];
-                    // Check if we reached last page?
-                    // If result.meta exists? 
-                    // Or if districts.length < per_page?
-                    // Let's assume for safety we limit to reasonable pages or stop if empty.
-                    if (districts.length < 15) hasMore = false; // Assuming default pagination 15
-                    else page++;
+                    page++;
                 }
 
-                // Safety break
-                if (page > 20) hasMore = false;
+                // Safety break to prevent infinite loops if API is weird
+                if (page > 100) hasMore = false;
             }
 
             // Map to our internal format
