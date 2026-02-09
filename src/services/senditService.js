@@ -155,14 +155,23 @@ const senditService = {
             if (!pickupId) {
                 try {
                     // Auto-detect Casablanca
-                    if (!cachedDistricts) cachedDistricts = await senditService.getAllDistricts();
-                    const casa = cachedDistricts.find(d => d.name.toLowerCase() === "casablanca");
+                    if (!cachedDistricts) {
+                        console.log("Fetching districts for auto-detect...");
+                        cachedDistricts = await senditService.getAllDistricts();
+                        console.log(`Fetched ${cachedDistricts.length} districts.`);
+                    }
+
+                    // Flexible match
+                    const casa = cachedDistricts.find(d => d.name && d.name.toLowerCase().includes("casablanca"));
+
                     if (casa) {
                         pickupId = casa.id;
-                        console.log("Auto-detected Pickup City: Casablanca (ID:", pickupId, ")");
+                        console.log(`✅ Auto-detected Pickup City: ${casa.name} (ID: ${pickupId})`);
+                    } else {
+                        console.warn("⚠️ 'Casablanca' not found in district list. Available examples:", cachedDistricts.slice(0, 5).map(d => d.name));
                     }
                 } catch (e) {
-                    console.warn("Could not auto-detect pickup city:", e);
+                    console.error("Could not auto-detect pickup city:", e);
                 }
             }
 
