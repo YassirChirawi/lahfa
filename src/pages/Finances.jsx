@@ -32,7 +32,8 @@ const KPICard = ({ title, value, icon: Icon, colorClass, subtext, alert }) => (
 );
 
 const Finances = () => {
-    const { orders } = useOrders();
+    const { orders: allOrders } = useOrders();
+    const orders = useMemo(() => allOrders.filter(o => !o.deleted), [allOrders]);
     const { expenses, addExpense, deleteExpense } = useExpenses();
     const { collections, addCollection } = useCollections();
 
