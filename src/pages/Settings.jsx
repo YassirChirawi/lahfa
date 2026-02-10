@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc } from 'firebase/firestore';
 import { Save, Lock, Truck, AlertCircle, CheckCircle } from 'lucide-react';
 import Button from '../components/Button';
-import { Tag, Calendar, Percent, ShoppingBag, Bell } from 'lucide-react';
+import { Tag, Calendar, Percent, ShoppingBag, Bell, Box } from 'lucide-react';
 import usePushNotifications from '../hooks/usePushNotifications';
+import { useProducts } from '../context/ProductContext';
 
 const NotificationButton = () => {
     const { requestPermission, permission } = usePushNotifications();
@@ -440,11 +441,63 @@ const DeliverySettings = () => {
 };
 
 const Settings = () => {
+    const { adjustStock, products } = useProducts();
+    const [isFixing, setIsFixing] = useState(false);
+
+    const handleFixStock = async () => {
+        if (!window.confirm("Cela va déduire le stock pour les 2 DERNIÈRES commandes. Continuer ?")) return;
+        setIsFixing(true);
+        try {
+            const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(2));
+            const snapshot = await getDocs(q);
+
+            let log = [];
+            for (const docSnap of snapshot.docs) {
+                const order = { id: docSnap.id, ...docSnap.data() };
+                const items = order.items || [{ article: order.article, quantity: order.quantity, productId: order.productId }];
+
+                log.push(`Commande #${order.displayId || order.id} (${order.customer}):`);
+
+                for (const item of items) {
+                    let pid = item.productId;
+                    let qty = parseInt(item.quantity || 1);
+
+                    if (!pid) {
+                        const p = products.find(prod => prod.name === item.article);
+                        if (p) pid = p.id;
+                    }
+
+                    if (pid) {
+                        await adjustStock(pid, -qty);
+                        log.push(`  - ${item.article}: Stock -${qty}`);
+                    } else {
+                        log.push(`  - ${item.article}: Produit introuvable!`);
+                    }
+                }
+            }
+            alert("Correction terminée:\n" + log.join("\n"));
+        } catch (e) {
+            alert("Erreur: " + e.message);
+        } finally {
+            setIsFixing(false);
+        }
+    };
+
     return (
-        <div className="p-6 max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center space-x-3 mb-6">
-                <Truck className="w-8 h-8 text-primary" />
-                <h1 className="text-2xl font-bold text-gray-800">Paramètres Généraux</h1>
+        <div className="p-6 max-w-4xl mx-auto space-y-6 pb-24">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                    <Truck className="w-8 h-8 text-indigo-600" />
+                    <h1 className="text-2xl font-bold text-gray-800">Paramètres Généraux</h1>
+                </div>
+                <button
+                    onClick={handleFixStock}
+                    disabled={isFixing}
+                    className="flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-xs font-medium transition-colors border border-gray-200"
+                >
+                    <Box size={14} />
+                    {isFixing ? '...' : 'Corriger Stock (2 dernières)'}
+                </button>
             </div>
 
             <DeliverySettings />

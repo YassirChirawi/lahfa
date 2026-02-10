@@ -174,7 +174,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                 setItems([]);
                 setSearchTerm('');
                 setProductSearch('');
-                setCurrentItem({ article: '', size: '', color: '', quantity: 1, price: 0 });
+                setCurrentItem({ article: '', productId: null, size: '', color: '', quantity: 1, price: 0 });
                 setIsBogoActive(false);
             }
         }
@@ -224,6 +224,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         setCurrentItem(prev => ({
             ...prev,
             article: product.name,
+            productId: product.id, // STORE ID
             price: product.price || 0,
             size: '', // Reset size/color on new product
             color: ''
@@ -239,7 +240,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         }
         setItems(prev => [...prev, { ...currentItem }]);
         // Reset current item input
-        setCurrentItem({ article: '', size: '', color: '', quantity: 1, price: 0 });
+        setCurrentItem({ article: '', productId: null, size: '', color: '', quantity: 1, price: 0 });
         setProductSearch('');
     };
 

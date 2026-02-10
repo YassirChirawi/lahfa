@@ -60,20 +60,27 @@ export const ProductProvider = ({ children }) => {
         }
     };
 
-    const decrementStock = async (productId, quantity) => {
+    const adjustStock = async (productId, delta) => {
         try {
-            // We need to fetch current stock to decrement accurately if we want to be atomic,
-            // or rely on what we have in state if single user. For now, let's use the local state to find current, then update.
-            // Ideally Firestore transactions are better for inventory.
-            // Simplified MVP:
             const product = products.find(p => p.id === productId);
             if (!product) return;
 
-            const newStock = Math.max(0, (product.stock || 0) - quantity);
+            const currentStock = parseInt(product.stock) || 0;
+            // Delta is change. If we sold 1, delta is -1.
+            // But wait, convention: usually 'decrement' means passed positive number to subtract.
+            // Let's stick to: adjustStock(id, quantityChange).
+            // If I sold 2, change is -2.
+
+            const newStock = Math.max(0, currentStock + delta);
             await updateProduct(productId, { stock: newStock });
         } catch (e) {
-            console.error("Error decrementing stock: ", e);
+            console.error("Error adjusting stock: ", e);
         }
+    };
+
+    // Backward compatibility wrapper if needed, or just replace usage.
+    const decrementStock = async (productId, quantity) => {
+        return adjustStock(productId, -Math.abs(quantity));
     };
 
     const addPendingReturn = async (productId, quantity) => {
@@ -115,6 +122,21 @@ export const ProductProvider = ({ children }) => {
         }
     };
 
+    const cancelPendingReturn = async (productId, quantity) => {
+        try {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const currentPending = parseInt(product.pendingStock) || 0;
+            const qtyToCancel = parseInt(quantity) || 1;
+            const newPending = Math.max(0, currentPending - qtyToCancel);
+
+            await updateProduct(productId, { pendingStock: newPending });
+        } catch (e) {
+            console.error("Error cancelling pending return: ", e);
+        }
+    };
+
     const value = {
         products,
         loading,
@@ -122,8 +144,10 @@ export const ProductProvider = ({ children }) => {
         updateProduct,
         deleteProduct,
         decrementStock,
+        adjustStock,
         addPendingReturn,
-        resolvePendingReturn
+        resolvePendingReturn,
+        cancelPendingReturn
     };
 
     return (

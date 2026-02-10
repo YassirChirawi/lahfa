@@ -126,14 +126,14 @@ const Orders = () => {
                 // Find items to return
                 const itemsToReturn = order.items || [{
                     article: order.article,
-                    quantity: order.quantity || 1,
-                    // Try to match product by name if ID usage is inconsistent/missing in older orders
+                    quantity: order.quantity || 1
                 }];
 
                 let returnedCount = 0;
                 for (const item of itemsToReturn) {
-                    // Try to find product by exact name match first (since we sort by name in catalog)
-                    const product = products.find(p => p.name === (item.article || item.name));
+                    let product = products.find(p => p.id === item.productId);
+                    if (!product) product = products.find(p => p.name === (item.article || item.name));
+
                     if (product) {
                         await addPendingReturn(product.id, item.quantity || 1);
                         returnedCount += (item.quantity || 1);
@@ -147,6 +147,26 @@ const Orders = () => {
                         </div>
                     ), { duration: 3000 });
                 }
+            }
+        }
+        // Handle Cancel Return Logic (Oops, it wasn't a return)
+        else if (previousStatus === 'Retour' && newStatus !== 'Retour') {
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+                const itemsToReturn = order.items || [{
+                    article: order.article,
+                    quantity: order.quantity || 1
+                }];
+
+                for (const item of itemsToReturn) {
+                    let product = products.find(p => p.id === item.productId);
+                    if (!product) product = products.find(p => p.name === (item.article || item.name));
+
+                    if (product) {
+                        await cancelPendingReturn(product.id, item.quantity || 1);
+                    }
+                }
+                toast("Statut retour annulé (Stock en attente retiré)", { icon: '↩️' });
             }
         }
 

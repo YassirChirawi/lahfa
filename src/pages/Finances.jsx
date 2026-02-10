@@ -270,7 +270,8 @@ const Finances = () => {
             {/* --- GLOBAL VIEW CONTENT --- */}
             {activeTab === 'global' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+                        <KPICard title="CA Total (Global)" value={`${globalStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-indigo-50 text-indigo-600" />
                         <KPICard title="CA (Mois actuel)" value={`${monthStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-blue-50 text-blue-600" />
                         <KPICard title="Bénéfice Net (Total)" value={`${globalStats.netProfit.toFixed(2)} DH`} icon={TrendingUp} colorClass="bg-green-50 text-green-600" subtext={`Marge: ${globalStats.margin.toFixed(1)}%`} />
                         <KPICard title="Revenus en Attente" value={`${totalPendingRevenue.toFixed(2)} DH`} icon={Activity} colorClass="bg-orange-50 text-orange-600" />

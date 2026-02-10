@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, runTransaction, getDoc } from 'firebase/firestore';
 
 const OrderContext = createContext();
 
@@ -16,7 +16,7 @@ export const OrderProvider = ({ children }) => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const { syncClientFromOrder } = useClients();
-    const { decrementStock } = useProducts();
+    const { decrementStock, adjustStock } = useProducts();
 
     // Helper: Log Action
     const logAction = async (action, orderId, details) => {
@@ -82,18 +82,22 @@ export const OrderProvider = ({ children }) => {
 
                 transaction.set(newOrderRef, newOrder);
 
-                // Note: Side effects (syncClient, stock) must be done AFTER transaction or handled carefully.
-                // We'll perform them after successful commitment merely by relying on the code execution flow below,
-                // but strictly speaking we can't return from void transaction easily to local variables unless we wrap.
-                // However, transaction function can return values!
                 return { newOrder, newId: newOrderRef.id };
             }).then(async ({ newOrder, newId }) => {
                 // Side effects after successful transaction
                 // Sync with Client Context
                 await syncClientFromOrder({ ...newOrder, id: newId });
 
-                // Decrement Stock if Product ID exists
-                if (newOrder.productId) {
+                // Decrement Stock for Items
+                if (newOrder.items && newOrder.items.length > 0) {
+                    for (const item of newOrder.items) {
+                        if (item.productId) {
+                            // Removing from stock -> negative delta
+                            await adjustStock(item.productId, -Math.abs(item.quantity || 1));
+                        }
+                    }
+                } else if (newOrder.productId) {
+                    // Legacy fallback
                     await decrementStock(newOrder.productId, newOrder.quantity || 1);
                 }
 
@@ -125,12 +129,46 @@ export const OrderProvider = ({ children }) => {
     const updateOrder = async (id, updatedData) => {
         try {
             const orderRef = doc(db, 'orders', id);
+
+            // Fetch current order state to diff items
+            const currentOrderDoc = await getDoc(orderRef);
+            const currentOrder = currentOrderDoc.data();
+
             await updateDoc(orderRef, updatedData);
 
-            // Sync with Client Context to ensure stats/details are up to date
-            // We pass the merged data (we might need to fetch it first or just pass updatedData if it has enough info)
-            // Ideally we should pass the full order object.
-            // For now let's pass updatedData assuming it has phone/customer/amount.
+            // Handle Stock Adjustments if items changed
+            if (updatedData.items && currentOrder) {
+                const oldItems = currentOrder.items || [];
+                const newItems = updatedData.items;
+
+                // Map productId -> quantity
+                const oldMap = {};
+                oldItems.forEach(i => {
+                    if (i.productId) oldMap[i.productId] = (oldMap[i.productId] || 0) + (parseInt(i.quantity) || 1);
+                });
+
+                const newMap = {};
+                newItems.forEach(i => {
+                    if (i.productId) newMap[i.productId] = (newMap[i.productId] || 0) + (parseInt(i.quantity) || 1);
+                });
+
+                // Calculate deltas
+                const allProductIds = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+
+                for (const pid of allProductIds) {
+                    const oldQty = oldMap[pid] || 0;
+                    const newQty = newMap[pid] || 0;
+                    const delta = newQty - oldQty; // e.g. 5 - 2 = 3 (Added 3) -> should reduce stock by 3
+
+                    if (delta !== 0) {
+                        // If we added items (delta positive), we reduce stock (negative adjustment)
+                        // If we removed items (delta negative), we increase stock (positive adjustment)
+                        await adjustStock(pid, -delta);
+                    }
+                }
+            }
+
+            // Sync with Client Context
             await syncClientFromOrder({ ...updatedData, date: updatedData.date || new Date().toISOString().split('T')[0] });
         } catch (e) {
             console.error("Error updating order: ", e);
