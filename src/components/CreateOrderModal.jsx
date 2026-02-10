@@ -101,7 +101,6 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
         instagram: '',
         amount: 0,
         deliveryFee: 0,
-        deliveryFee: 0,
         deliveryValues: {
             allowTry: false,
             allowOpen: false,

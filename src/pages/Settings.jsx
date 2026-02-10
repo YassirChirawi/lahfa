@@ -348,15 +348,21 @@ const DeliverySettings = () => {
                                 type="button"
                                 onClick={async () => {
                                     try {
-                                        await fetch('/api/sendit-test-notification', {
+                                        const res = await fetch('/api/sendit-test-notification', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            // eslint-disable-next-line
                                             body: JSON.stringify({ message: "test notif a ziiiin" })
                                         });
-                                        alert("Notif envoyée !");
+
+                                        const data = await res.json();
+
+                                        if (res.ok) {
+                                            alert("Succès: " + (data.message || "Notif envoyée !"));
+                                        } else {
+                                            alert("Erreur Serveur: " + (data.message || "Erreur inconnue") + "\n" + (data.error || ""));
+                                        }
                                     } catch (e) {
-                                        alert("Erreur: " + e.message);
+                                        alert("Erreur Réseau/Client: " + e.message);
                                     }
                                 }}
                                 className="text-xs text-gray-400 hover:text-gray-600 underline"
