@@ -77,7 +77,7 @@ export default async function handler(req, res) {
             tokens: tokens
         };
 
-        const response = await messaging.sendMulticast(notificationPayload);
+        const response = await messaging.sendEachForMulticast(notificationPayload);
 
         return res.status(200).json({
             message: 'Test notification processed',

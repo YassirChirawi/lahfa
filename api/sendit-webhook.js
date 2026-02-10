@@ -1,27 +1,32 @@
 // api/sendit-webhook.js
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
 // Initialize Firebase Admin SDK
-// We need to check if it's already initialized to avoid "default app already defined" errors in hot reloads
-if (!admin.apps.length) {
-    // In Vercel, we will store the Service Account JSON in an environment variable
-    // FIREBASE_SERVICE_ACCOUNT
+if (getApps().length === 0) {
     try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
-        if (serviceAccount.project_id) { // Basic check to see if it's valid
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-        } else {
-            console.warn("Missing or invalid FIREBASE_SERVICE_ACCOUNT env var. Init skipped or failed.");
+        const serviceAccountData = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (serviceAccountData) {
+            let serviceAccount;
+            try {
+                serviceAccount = typeof serviceAccountData === 'string'
+                    ? JSON.parse(serviceAccountData)
+                    : serviceAccountData;
+
+                if (serviceAccount.project_id) {
+                    initializeApp({
+                        credential: cert(serviceAccount)
+                    });
+                }
+            } catch (parseError) {
+                console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT:", parseError);
+            }
         }
     } catch (e) {
         console.error("Firebase Admin Init Error:", e);
     }
 }
-
-const db = admin.firestore();
-const messaging = admin.messaging();
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -29,31 +34,32 @@ export default async function handler(req, res) {
     }
 
     try {
+        // Safe check for initialization
+        if (getApps().length === 0) {
+            console.error("Firebase Admin not initialized in webhook.");
+            return res.status(500).json({ message: 'Server Configuration Error' });
+        }
+
+        const db = getFirestore();
         const body = req.body;
         console.log("Sendit Webhook Received:", body);
 
-        // Sendit Payload variations:
-        // 1. { code: "TRACK123", status: "Livré", ... }
-        // 2. { data: { code: "...", status: "..." } } (?) - preparing for both
         const trackingID = body.code || body.data?.code || body.tracking_code;
         const newStatus = body.status || body.data?.status;
 
         if (!trackingID || !newStatus) {
             console.warn("⚠️ Invalid Payload:", body);
-            // Return 200 to acknowledge receipt and prevent indefinite retries
             return res.status(200).json({
                 message: 'Payload missing trackingID or status',
                 received: body
             });
         }
 
-        // 1. Find the order with this trackingID (in deliveryValues.trackingID)
         const ordersRef = db.collection('orders');
         const snapshot = await ordersRef.where('deliveryValues.trackingID', '==', String(trackingID)).get();
 
         if (snapshot.empty) {
-            console.log(`Checking normalized tracking ID...`);
-            // Add fallback logic if needed
+            // Check legacy location or other possibilities if needed
             return res.status(200).json({ message: 'Order not found', trackingID });
         }
 
@@ -93,6 +99,9 @@ export default async function handler(req, res) {
 // Helper to send FCM Notification
 async function sendPushNotification(order, newStatus) {
     try {
+        const db = getFirestore();
+        const messaging = getMessaging();
+
         // Fetch all tokens
         const tokensSnap = await db.collection('fcm_tokens').get();
         if (tokensSnap.empty) return;
@@ -108,12 +117,13 @@ async function sendPushNotification(order, newStatus) {
             },
             data: {
                 orderId: order.id || '',
-                url: '/dashboard' // Action URL if supported by SW
+                url: '/dashboard'
             },
             tokens: tokens
         };
 
-        const response = await messaging.sendMulticast(message);
+        // Use sendEachForMulticast instead of deprecated sendMulticast
+        const response = await messaging.sendEachForMulticast(message);
         console.log('Notifications sent:', response.successCount, 'failures:', response.failureCount);
 
     } catch (e) {
