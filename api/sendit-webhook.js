@@ -28,13 +28,31 @@ if (getApps().length === 0) {
     }
 }
 
+const mapSenditStatus = (senditStatus) => {
+    if (!senditStatus) return null;
+    const normalized = senditStatus.toUpperCase();
+    const statusMap = {
+        'DELIVERED': 'Livré', 'LIVRÉ': 'Livré',
+        'CANCELED': 'Retour', 'ANNULÉ': 'Retour',
+        'REJECTED': 'Retour', 'REFUSÉ': 'Retour',
+        'DELIVERING': 'Livraison', 'EN COURS DE LIVRAISON': 'Livraison',
+        'DISTRIBUTED': 'Livraison', 'DISTRIBUÉ': 'Livraison',
+        'UNREACHABLE': 'Pas de réponse client', 'INJOIGNABLE': 'Pas de réponse client',
+        'POSTPONED': 'Pas de réponse client', 'REPORTÉ': 'Pas de réponse client',
+        'PICKED_UP': 'Ramassage', 'RAMASSÉ': 'Ramassage',
+        'WAREHOUSE': 'Ramassage', 'ENTREPÔT': 'Ramassage',
+        'TRANSIT': 'Ramassage', 'EN TRANSIT': 'Ramassage',
+        'CREATED': 'Ramassage'
+    };
+    return statusMap[normalized] || null;
+};
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        // Safe check for initialization
         if (getApps().length === 0) {
             console.error("Firebase Admin not initialized in webhook.");
             return res.status(500).json({ message: 'Server Configuration Error' });
@@ -45,38 +63,44 @@ export default async function handler(req, res) {
         console.log("Sendit Webhook Received:", body);
 
         const trackingID = body.code || body.data?.code || body.tracking_code;
-        const newStatus = body.status || body.data?.status;
+        const senditStatus = body.status || body.data?.status;
 
-        if (!trackingID || !newStatus) {
-            console.warn("⚠️ Invalid Payload:", body);
-            return res.status(200).json({
-                message: 'Payload missing trackingID or status',
-                received: body
-            });
+        if (!trackingID || !senditStatus) {
+            return res.status(200).json({ message: 'Payload missing trackingID or status', received: body });
         }
 
         const ordersRef = db.collection('orders');
         const snapshot = await ordersRef.where('deliveryValues.trackingID', '==', String(trackingID)).get();
 
         if (snapshot.empty) {
-            // Check legacy location or other possibilities if needed
             return res.status(200).json({ message: 'Order not found', trackingID });
         }
 
         let updates = 0;
         const promises = snapshot.docs.map(async (doc) => {
             const order = doc.data();
-            const currentStatus = order.deliveryValues?.status;
+            const currentDeliveryStatus = order.deliveryValues?.status;
 
-            if (currentStatus !== newStatus) {
-                // Update Firestore
-                await doc.ref.update({
-                    'deliveryValues.status': newStatus,
-                    'deliveryValues.lastChecked': new Date().toISOString()
-                });
+            const mappedStatus = mapSenditStatus(senditStatus);
+            const needsMainStatusUpdate = mappedStatus && mappedStatus !== order.status;
+            const needsDeliveryStatusUpdate = currentDeliveryStatus !== senditStatus;
 
-                // Send Push Notification
-                await sendPushNotification(order, newStatus);
+            if (needsMainStatusUpdate || needsDeliveryStatusUpdate) {
+                const updateData = {
+                    'deliveryValues.status': senditStatus,
+                    'deliveryValues.lastSync': new Date().toISOString()
+                };
+
+                if (needsMainStatusUpdate) {
+                    updateData['status'] = mappedStatus;
+                }
+
+                await doc.ref.update(updateData);
+
+                // Note: Stock logic (Pending Return) is intentionally left for Dashboard Sync 
+                // to avoid complexity in serverless function, or could be added here if needed.
+
+                await sendPushNotification(order, mappedStatus || senditStatus);
                 updates++;
             }
         });

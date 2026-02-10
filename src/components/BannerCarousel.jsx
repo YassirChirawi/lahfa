@@ -32,6 +32,15 @@ const BannerCarousel = () => {
         return () => clearInterval(interval);
     }, [banners.length]);
 
+    // Reset index if it goes out of bounds when banners change
+    useEffect(() => {
+        if (currentIndex >= banners.length) {
+            setCurrentIndex(0);
+        }
+    }, [banners.length, currentIndex]);
+
+    const currentBanner = banners[currentIndex] || banners[0];
+
     return (
         <div className="h-full flex items-center justify-center overflow-hidden w-full">
             <AnimatePresence mode='wait'>
@@ -44,10 +53,10 @@ const BannerCarousel = () => {
                     className="flex flex-col md:flex-row items-center gap-2 md:gap-3 text-center"
                 >
                     <span className="text-xs md:text-sm font-serif tracking-widest text-gray-900 uppercase font-bold border-b border-pink-200 pb-0.5">
-                        {banners[currentIndex].title}
+                        {currentBanner.title}
                     </span>
                     <span className="text-[10px] md:text-xs font-light tracking-wide text-gray-500 uppercase">
-                        {banners[currentIndex].subtitle}
+                        {currentBanner.subtitle}
                     </span>
                 </motion.div>
             </AnimatePresence>

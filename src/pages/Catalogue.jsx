@@ -15,6 +15,7 @@ const Catalogue = () => {
     const [searchParams] = useSearchParams();
     const [zoomedProduct, setZoomedProduct] = useState(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
 
     // Cart State
     const [cart, setCart] = useState(() => {

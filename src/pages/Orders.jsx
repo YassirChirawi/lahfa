@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
@@ -16,20 +16,33 @@ import '../styles/modal.css';
 import MessagePreviewModal from '../components/MessagePreviewModal';
 
 const mapSenditStatus = (senditStatus) => {
+    if (!senditStatus) return null;
+    const normalized = senditStatus.toUpperCase();
+
     const statusMap = {
         'DELIVERED': 'Livré',
+        'LIVRÉ': 'Livré',
         'CANCELED': 'Retour',
+        'ANNULÉ': 'Retour',
         'REJECTED': 'Retour',
+        'REFUSÉ': 'Retour',
         'DELIVERING': 'Livraison',
+        'EN COURS DE LIVRAISON': 'Livraison',
         'DISTRIBUTED': 'Livraison',
+        'DISTRIBUÉ': 'Livraison',
         'UNREACHABLE': 'Pas de réponse client',
+        'INJOIGNABLE': 'Pas de réponse client',
         'POSTPONED': 'Pas de réponse client',
+        'REPORTÉ': 'Pas de réponse client',
         'PICKED_UP': 'Ramassage',
+        'RAMASSÉ': 'Ramassage',
         'WAREHOUSE': 'Ramassage',
+        'ENTREPÔT': 'Ramassage',
         'TRANSIT': 'Ramassage',
+        'EN TRANSIT': 'Ramassage',
         'CREATED': 'Ramassage'
     };
-    return statusMap[senditStatus] || null;
+    return statusMap[normalized] || null;
 };
 
 const Orders = () => {
@@ -800,13 +813,25 @@ const Orders = () => {
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <button
-                                                                className={`icon-btn-sm hover:bg-green-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : 'text-green-600'}`}
-                                                                onClick={() => handleSyncStatus(order)}
-                                                                title={`Provider: ${order.deliveryValues.provider}\nRef: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}`}
-                                                            >
-                                                                <RefreshCw size={16} />
-                                                            </button>
+                                                            <>
+                                                                <button
+                                                                    className={`icon-btn-sm hover:bg-green-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : 'text-green-600'}`}
+                                                                    onClick={() => handleSyncStatus(order)}
+                                                                    title={`Sync avec ${order.deliveryValues.provider}`}
+                                                                >
+                                                                    <RefreshCw size={16} />
+                                                                </button>
+                                                                <button
+                                                                    className="icon-btn-sm text-gray-500 hover:bg-gray-100"
+                                                                    onClick={() => {
+                                                                        const details = `📦 Détails Livraison\n------------------\nFournisseur: ${order.deliveryValues.provider}\nTracking ID: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}\nDernière Sync: ${order.deliveryValues.lastSync ? new Date(order.deliveryValues.lastSync).toLocaleString() : 'Jamais'}`;
+                                                                        alert(details);
+                                                                    }}
+                                                                    title="Voir détails tracking"
+                                                                >
+                                                                    <Eye size={16} />
+                                                                </button>
+                                                            </>
                                                         )}
 
                                                         <button
@@ -833,38 +858,27 @@ const Orders = () => {
                                                             title="Supprimer">
                                                             <Trash2 size={16} />
                                                         </button>
+
+                                                        {/* WhatsApp Button */}
+                                                        {order.phone && (
+                                                            <button
+                                                                onClick={() => handleOpenWhatsApp(order)}
+                                                                className="icon-btn-sm text-green-600 hover:bg-green-50 ml-1"
+                                                                title={`Envoyer message WhatsApp (${order.status}) - ${whatsappLang.toUpperCase()}`}
+                                                            >
+                                                                <MessageCircle size={16} />
+                                                            </button>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     <div className="flex gap-2">
-                                                        <button
-                                                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 flex items-center gap-1 text-sm font-medium"
-                                                            onClick={() => restoreOrder(order.id)}
-                                                            title="Restaurer"
-                                                        >
-                                                            <RotateCcw size={14} /> Restore
+                                                        <button className="icon-btn-sm text-green-500 hover:bg-green-50" onClick={() => restoreOrder(order.id)} title="Restaurer">
+                                                            <RotateCcw size={16} />
                                                         </button>
-                                                        <button
-                                                            className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 flex items-center gap-1 text-sm font-medium"
-                                                            onClick={() => {
-                                                                if (window.confirm('Delete permanently? This cannot be undone.')) {
-                                                                    permanentDeleteOrder(order.id);
-                                                                }
-                                                            }}
-                                                            title="Supprimer définitivement"
-                                                        >
-                                                            <Trash2 size={14} /> Delete
+                                                        <button className="icon-btn-sm text-red-500 hover:bg-red-50" onClick={() => permanentDeleteOrder(order.id)} title="Supprimer définitivement">
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
-                                                )}
-                                                {/* WhatsApp Button */}
-                                                {!showTrash && order.phone && (
-                                                    <button
-                                                        onClick={() => handleOpenWhatsApp(order)}
-                                                        className="icon-btn-sm text-green-500 hover:bg-green-50 ml-1"
-                                                        title={`Envoyer message WhatsApp (${order.status}) - ${whatsappLang.toUpperCase()}`}
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -878,7 +892,7 @@ const Orders = () => {
                         )}
                     </tbody>
                 </table>
-            </div>
+            </div >
 
             <CreateOrderModal
                 isOpen={isModalOpen}

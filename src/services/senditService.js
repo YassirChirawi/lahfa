@@ -430,25 +430,53 @@ const senditService = {
 
     /**
      * Sync all deliveries statuses in one call
-     * Fetches current deliveries list from Sendit
+     * Fetches ALL deliveries from Sendit (handles pagination)
      */
-    syncAllDeliveries: async (page = 1) => {
+    syncAllDeliveries: async () => {
         try {
             const token = await senditService.getToken();
-            const response = await fetch(`${API_BASE_URL}/deliveries?page=${page}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
+            let allDeliveries = [];
+            let page = 1;
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetch(`${API_BASE_URL}/deliveries?page=${page}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || "Erreur lors de la récupération des colis Sendit");
                 }
-            });
 
-            const result = await response.json();
+                const pageDeliveries = result.data || [];
+                allDeliveries = [...allDeliveries, ...pageDeliveries];
 
-            if (!response.ok) {
-                throw new Error(result.message || "Erreur lors de la synchronisation globale");
+                // Check pagination
+                if (result.meta && result.meta.last_page) {
+                    if (page >= result.meta.last_page) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else if (result.next_page_url) {
+                    // Fallback if structure is different but has next_page_url
+                    page++;
+                } else {
+                    // No pagination info, assume single page
+                    hasMore = false;
+                }
+
+                // Safety break
+                if (page > 50) hasMore = false;
+                if (page > 50) hasMore = false;
             }
 
-            return result; // Returns { data: [ { code, status, ... } ], meta: ... }
+            return { data: allDeliveries };
         } catch (error) {
             console.error("Sendit Global Sync Error:", error);
             throw error;
