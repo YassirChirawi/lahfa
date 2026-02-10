@@ -197,7 +197,15 @@ const PromotionSettings = () => {
 const DeliverySettings = () => {
     const [settings, setSettings] = useState({
         olivraison: { apiKey: '', secretKey: '', active: true, baseUrl: 'https://partners.olivraison.com' },
-        sendit: { publicKey: '', secretKey: '', active: false }
+        sendit: {
+            publicKey: '',
+            secretKey: '',
+            active: false,
+            pickup_name: '',
+            pickup_phone: '',
+            pickup_address: '',
+            pickup_district_id: ''
+        }
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -408,6 +416,61 @@ const DeliverySettings = () => {
                             onChange={e => handleChange('sendit', 'secretKey', e.target.value)}
                             className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none"
                         />
+                    </div>
+
+                    {/* Pickup Information */}
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-4 border border-gray-100">
+                        <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                            <Box size={14} /> Information de Ramassage (Vendeur)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1">Nom du Vendeur</label>
+                                <input
+                                    type="text"
+                                    placeholder="ex: Lahfa Intimate"
+                                    value={settings.sendit.pickup_name || ''}
+                                    onChange={e => handleChange('sendit', 'pickup_name', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1">Téléphone Ramassage</label>
+                                <input
+                                    type="text"
+                                    placeholder="ex: 0612345678"
+                                    value={settings.sendit.pickup_phone || ''}
+                                    onChange={e => handleChange('sendit', 'pickup_phone', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1">Adresse de Ramassage</label>
+                                <input
+                                    type="text"
+                                    placeholder="ex: Appt 5, Immeuble B, Quartier Maarif"
+                                    value={settings.sendit.pickup_address || ''}
+                                    onChange={e => handleChange('sendit', 'pickup_address', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1">Ville de Ramassage (Sendit ID)</label>
+                                <select
+                                    value={settings.sendit.pickup_district_id || ''}
+                                    onChange={e => handleChange('sendit', 'pickup_district_id', e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+                                >
+                                    <option value="">Sélectionner une ville...</option>
+                                    {/* Try to get cities from Firestore metadata if available */}
+                                    {/* Note: In a real app we'd fetch this list, but let's assume cityCount is there */}
+                                    {/* For now, just show the selected ID or Casablanca as fallback if we can't easily map */}
+                                    <option value="1">Casablanca (Général)</option>
+                                    <option value={settings.sendit.pickup_district_id}>{settings.sendit.pickup_district_id ? `ID: ${settings.sendit.pickup_district_id}` : 'Autre...'}</option>
+                                </select>
+                                <p className="text-[10px] text-gray-400 mt-1 italic">* Synchronisez les villes ci-dessous pour trouver l'ID précis si besoin.</p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Sync Cities UI */}

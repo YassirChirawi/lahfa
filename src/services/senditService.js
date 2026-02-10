@@ -205,11 +205,12 @@ const senditService = {
                 phone: order.phone || "",
                 address: order.address || order.city || "Adresse inconnue",
                 amount: parseFloat(order.amount) || 0,
-                note: order.notes || "",
+                comment: order.notes || "",
+                reference: order.displayId || order.id || "",
                 products: productsString,
-                is_try: order.deliveryValues?.allowTry ? 1 : 0,
-                is_open: order.deliveryValues?.allowOpen ? 1 : 0,
-                is_exchange: order.deliveryValues?.isExchange ? 1 : 0,
+                allow_try: order.deliveryValues?.allowTry ? 1 : 0,
+                allow_open: order.deliveryValues?.allowOpen ? 1 : 0,
+                option_exchange: order.deliveryValues?.isExchange ? 1 : 0,
             };
 
             console.log("Creating Sendit Package:", payload);
@@ -306,8 +307,185 @@ const senditService = {
             console.error("Sendit Cancel Error:", error);
             throw error;
         }
+    },
+
+    /**
+     * Request a pickup (Ramassage)
+     */
+    requestPickup: async (pickupData) => {
+        try {
+            const token = await senditService.getToken();
+
+            // Payload based on documentation:
+            // district_id, name, phone, address, comment, deliveries (comma separated codes)
+            const payload = {
+                district_id: parseInt(pickupData.district_id || 1),
+                name: pickupData.name || "Vendeur",
+                phone: pickupData.phone || "",
+                address: pickupData.address || "",
+                comment: pickupData.note || "Demande de ramassage depuis le dashboard",
+                deliveries: pickupData.deliveries // DX1,DX2,DX3
+            };
+
+            console.log("Requesting Sendit Pickup:", payload);
+
+            const response = await fetch(`${API_BASE_URL}/pickups`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error("Sendit Pickup Error:", result);
+                throw new Error(result.message || "Erreur lors de la demande de ramassage");
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Sendit Request Pickup Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Request a return (Retour)
+     */
+    requestReturn: async (returnData) => {
+        try {
+            const token = await senditService.getToken();
+
+            // Payload based on documentation:
+            // district_id, name, phone, address, comment, deliveries (comma separated codes)
+            const payload = {
+                district_id: parseInt(returnData.district_id || 1),
+                name: returnData.name || "Vendeur",
+                phone: returnData.phone || "",
+                address: returnData.address || "",
+                comment: returnData.note || "Demande de retour depuis le dashboard",
+                deliveries: returnData.deliveries // DX1,DX2,DX3
+            };
+
+            console.log("Requesting Sendit Return:", payload);
+
+            const response = await fetch(`${API_BASE_URL}/returns`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error("Sendit Return Error:", result);
+                throw new Error(result.message || "Erreur lors de la demande de retour");
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Sendit Request Return Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get PDF labels for a list of deliveries
+     * @param {string} deliveries - Comma separated tracking codes
+     * @param {number} printFormat - 1 for Thermal (10x10), 0 for A4
+     */
+    getLabels: async (deliveries, printFormat = 1) => {
+        try {
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/deliveries/getlabels`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ deliveries, printFormat })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || "Erreur lors de la génération des étiquettes");
+            }
+
+            return result; // Should contain the PDF URL
+        } catch (error) {
+            console.error("Sendit GetLabels Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Sync all deliveries statuses in one call
+     * Fetches current deliveries list from Sendit
+     */
+    syncAllDeliveries: async (page = 1) => {
+        try {
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/deliveries?page=${page}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || "Erreur lors de la synchronisation globale");
+            }
+
+            return result; // Returns { data: [ { code, status, ... } ], meta: ... }
+        } catch (error) {
+            console.error("Sendit Global Sync Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get invoices list
+     */
+    getInvoices: async () => {
+        try {
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/invoices`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || "Erreur lors de la récupération des factures");
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Sendit Invoices Error:", error);
+            throw error;
+        }
     }
 };
 
 export const getAllDistricts = senditService.getAllDistricts;
+export const requestPickup = senditService.requestPickup;
+export const requestReturn = senditService.requestReturn;
+export const getLabels = senditService.getLabels;
+export const syncAllDeliveries = senditService.syncAllDeliveries;
+export const getInvoices = senditService.getInvoices;
 export default senditService;

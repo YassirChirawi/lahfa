@@ -2,11 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { useCollections } from '../context/CollectionContext';
-import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download } from 'lucide-react';
+import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download, FileText, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'; // Removed BarChart/Bar as unused
 import Modal from '../components/Modal';
 import FloatingActionButton from '../components/FloatingActionButton';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import senditService from '../services/senditService';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 const EXPENSE_CATEGORIES = ['Marketing', 'Stock', 'Livraison', 'Salaire', 'Autre'];
@@ -47,8 +51,11 @@ const Finances = () => {
     // Modals
     const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false); // New modal for expenses
+    const [isSenditModalOpen, setIsSenditModalOpen] = useState(false);
 
     const [newCollection, setNewCollection] = useState({ name: '', startDate: '', endDate: '' });
+    const [invoices, setInvoices] = useState([]);
+    const [isSenditActive, setIsSenditActive] = useState(false);
 
     // Set default selected collection to the most recent one on load
     useEffect(() => {
@@ -56,6 +63,29 @@ const Finances = () => {
             setSelectedCollectionId(collections[0].id);
         }
     }, [collections, selectedCollectionId]);
+
+    // Check Sendit status
+    useEffect(() => {
+        const checkSendit = async () => {
+            const snap = await getDoc(doc(db, 'settings', 'delivery'));
+            if (snap.exists() && snap.data().sendit?.active) {
+                setIsSenditActive(true);
+            }
+        };
+        checkSendit();
+    }, []);
+
+    const handleFetchInvoices = async () => {
+        setIsSenditModalOpen(true);
+        const toastId = toast.loading("Chargement des factures Sendit...");
+        try {
+            const data = await senditService.getInvoices();
+            setInvoices(data.data || data);
+            toast.success("Factures récupérées", { id: toastId });
+        } catch (error) {
+            toast.error("Erreur lors de la récupération des factures", { id: toastId });
+        }
+    };
 
     // --- Helpers ---
     const calculateStats = (filteredOrders, filteredExpenses) => {
@@ -246,9 +276,20 @@ const Finances = () => {
         <div className="space-y-8 p-4 md:p-8" style={{ backgroundColor: '#F9FAFB', minHeight: '100vh', paddingBottom: '80px' }}>
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Finances</h1>
-                    <p className="text-gray-500 mt-1 hidden md:block">Suivez vos revenus, dépenses et bénéfices.</p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">Finances</h1>
+                        <p className="text-gray-500 mt-1 hidden md:block">Suivez vos revenus, dépenses et bénéfices.</p>
+                    </div>
+                    {isSenditActive && (
+                        <button
+                            onClick={handleFetchInvoices}
+                            className="px-4 py-2 bg-orange-50 text-orange-600 border border-orange-100 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-2 text-sm font-bold shadow-sm"
+                        >
+                            <FileText size={18} />
+                            Factures Sendit
+                        </button>
+                    )}
                 </div>
 
                 {/* Tabs */}
@@ -551,6 +592,58 @@ const Finances = () => {
                         <button type="submit" className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">Créer</button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* --- SENDIT INVOICES MODAL --- */}
+            <Modal
+                isOpen={isSenditModalOpen}
+                onClose={() => setIsSenditModalOpen(false)}
+                title="Factures Sendit (Ramassage)"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-gray-500">Liste des factures de ramassage et livraison émises par Sendit.</p>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                                <tr>
+                                    <th className="px-4 py-2">ID</th>
+                                    <th className="px-4 py-2">Date</th>
+                                    <th className="px-4 py-2 text-right">Montant</th>
+                                    <th className="px-4 py-2">Statut</th>
+                                    <th className="px-4 py-2 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {invoices.length > 0 ? (
+                                    invoices.map(inv => (
+                                        <tr key={inv.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-2 font-medium">#{inv.id}</td>
+                                            <td className="px-4 py-2 text-gray-500">{inv.date || inv.created_at}</td>
+                                            <td className="px-4 py-2 text-right font-bold text-gray-900">{inv.total || inv.amount} DH</td>
+                                            <td className="px-4 py-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                    {inv.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                {inv.url && (
+                                                    <a href={inv.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800">
+                                                        <Download size={16} />
+                                                    </a>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="5" className="px-4 py-8 text-center text-gray-400">Aucune facture trouvée.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

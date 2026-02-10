@@ -255,8 +255,8 @@ const Catalogue = () => {
                                                     Approvisionnement
                                                 </div>
                                             ) : (
-                                                <div className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-full shadow-lg">
-                                                    Épuisé
+                                                <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs md:text-sm tracking-wide uppercase font-extrabold px-4 py-2 rounded-full shadow-xl shadow-pink-500/40 border-2 border-white/20 animate-pulse">
+                                                    Victime de son succès 💎
                                                 </div>
                                             )
                                         ) : null}
@@ -297,10 +297,26 @@ const Catalogue = () => {
                                     </div>
 
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
-                                        className="mt-auto w-full bg-gray-900 group-hover:bg-pink-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 font-medium text-sm shadow-lg shadow-gray-200 group-hover:shadow-pink-200 active:scale-95"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (product.stock > 0) addToCart(product);
+                                        }}
+                                        disabled={product.stock <= 0}
+                                        className={`mt-auto w-full py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 font-medium text-sm shadow-lg
+                                            ${product.stock > 0
+                                                ? 'bg-gray-900 group-hover:bg-pink-600 text-white shadow-gray-200 group-hover:shadow-pink-200 active:scale-95'
+                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                            }`}
                                     >
-                                        <Plus size={16} /> Ajouter au panier
+                                        {product.stock > 0 ? (
+                                            <>
+                                                <Plus size={16} /> Ajouter au panier
+                                            </>
+                                        ) : (
+                                            <>
+                                                <X size={16} /> Rupture de Stock
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </motion.div>
@@ -420,12 +436,27 @@ const Catalogue = () => {
                                     <div className="flex gap-3 justify-center">
                                         <button
                                             onClick={() => {
-                                                addToCart(zoomedProduct);
-                                                setZoomedProduct(null);
+                                                if (zoomedProduct.stock > 0) {
+                                                    addToCart(zoomedProduct);
+                                                    setZoomedProduct(null);
+                                                }
                                             }}
-                                            className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl active:scale-95"
+                                            disabled={zoomedProduct.stock <= 0}
+                                            className={`px-8 py-3 rounded-full font-bold transition-all flex items-center gap-2 shadow-lg
+                                                ${zoomedProduct.stock > 0
+                                                    ? 'bg-black text-white hover:bg-gray-800 hover:shadow-xl active:scale-95'
+                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                                }`}
                                         >
-                                            <ShoppingBag size={18} /> Ajouter
+                                            {zoomedProduct.stock > 0 ? (
+                                                <>
+                                                    <ShoppingBag size={18} /> Ajouter
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <X size={18} /> Rupture
+                                                </>
+                                            )}
                                         </button>
                                         <button
                                             onClick={() => handleInstagram(zoomedProduct)}

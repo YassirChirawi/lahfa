@@ -15,9 +15,26 @@ import '../styles/modal.css';
 
 import MessagePreviewModal from '../components/MessagePreviewModal';
 
+const mapSenditStatus = (senditStatus) => {
+    const statusMap = {
+        'DELIVERED': 'Livré',
+        'CANCELED': 'Retour',
+        'REJECTED': 'Retour',
+        'DELIVERING': 'Livraison',
+        'DISTRIBUTED': 'Livraison',
+        'UNREACHABLE': 'Pas de réponse client',
+        'POSTPONED': 'Pas de réponse client',
+        'PICKED_UP': 'Ramassage',
+        'WAREHOUSE': 'Ramassage',
+        'TRANSIT': 'Ramassage',
+        'CREATED': 'Ramassage'
+    };
+    return statusMap[senditStatus] || null;
+};
+
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
-    const { products, addPendingReturn } = useProducts();
+    const { products, addPendingReturn, cancelPendingReturn } = useProducts();
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [cityFilter, setCityFilter] = useState('');
@@ -29,6 +46,7 @@ const Orders = () => {
     const [editingOrder, setEditingOrder] = useState(null);
     const [showTrash, setShowTrash] = useState(false); // Toggle for deleted orders
     const [whatsappLang, setWhatsappLang] = useState('fr'); // 'fr' or 'darija'
+    const [selectedOrders, setSelectedOrders] = useState([]); // Multiple selection for ramassage
 
     // WhatsApp Modal State
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -115,70 +133,86 @@ const Orders = () => {
         setIsWhatsAppModalOpen(true);
     };
 
-    const handleStatusChange = async (orderId, newStatus) => {
-        const previousStatus = orders.find(o => o.id === orderId)?.status;
+    const toggleOrderSelection = (id) => {
+        setSelectedOrders(prev =>
+            prev.includes(id) ? prev.filter(oid => oid !== id) : [...prev, id]
+        );
+    };
+
+    const toggleAllSelection = () => {
+        if (selectedOrders.length === filteredOrders.length) {
+            setSelectedOrders([]);
+        } else {
+            setSelectedOrders(filteredOrders.map(o => o.id));
+        }
+    };
+
+    const applyStatusUpdate = async (orderId, newStatus) => {
+        const order = orders.find(o => o.id === orderId);
+        if (!order) return;
+
+        const previousStatus = order.status;
+        if (previousStatus === newStatus) return;
+
         await updateOrderStatus(orderId, newStatus);
 
-        // Handle Return Logic
+        // Handle Return Logic (Stock)
         if (newStatus === 'Retour' && previousStatus !== 'Retour') {
-            const order = orders.find(o => o.id === orderId);
-            if (order) {
-                // Find items to return
-                const itemsToReturn = order.items || [{
-                    article: order.article,
-                    quantity: order.quantity || 1
-                }];
+            const itemsToReturn = order.items || [{
+                article: order.article,
+                quantity: order.quantity || 1
+            }];
 
-                let returnedCount = 0;
-                for (const item of itemsToReturn) {
-                    let product = products.find(p => p.id === item.productId);
-                    if (!product) product = products.find(p => p.name === (item.article || item.name));
+            let returnedCount = 0;
+            for (const item of itemsToReturn) {
+                let product = products.find(p => p.id === item.productId);
+                if (!product) product = products.find(p => p.name === (item.article || item.name));
 
-                    if (product) {
-                        await addPendingReturn(product.id, item.quantity || 1);
-                        returnedCount += (item.quantity || 1);
-                    }
-                }
-                if (returnedCount > 0) {
-                    toast.custom((t) => (
-                        <div className="bg-orange-100 border border-orange-200 text-orange-800 px-4 py-2 rounded shadow-md flex items-center gap-2">
-                            <RotateCcw size={16} />
-                            <span>{returnedCount} produits marqués "En attente de retour"</span>
-                        </div>
-                    ), { duration: 3000 });
+                if (product) {
+                    await addPendingReturn(product.id, item.quantity || 1);
+                    returnedCount += (item.quantity || 1);
                 }
             }
+            if (returnedCount > 0) {
+                toast.custom((t) => (
+                    <div className="bg-orange-100 border border-orange-200 text-orange-800 px-4 py-2 rounded shadow-md flex items-center gap-2">
+                        <RotateCcw size={16} />
+                        <span>{returnedCount} produits marqués "En attente de retour"</span>
+                    </div>
+                ), { duration: 3000 });
+            }
         }
-        // Handle Cancel Return Logic (Oops, it wasn't a return)
+        // Handle Cancel Return Logic (Stock)
         else if (previousStatus === 'Retour' && newStatus !== 'Retour') {
-            const order = orders.find(o => o.id === orderId);
-            if (order) {
-                const itemsToReturn = order.items || [{
-                    article: order.article,
-                    quantity: order.quantity || 1
-                }];
+            const itemsToReturn = order.items || [{
+                article: order.article,
+                quantity: order.quantity || 1
+            }];
 
-                for (const item of itemsToReturn) {
-                    let product = products.find(p => p.id === item.productId);
-                    if (!product) product = products.find(p => p.name === (item.article || item.name));
+            for (const item of itemsToReturn) {
+                let product = products.find(p => p.id === item.productId);
+                if (!product) product = products.find(p => p.name === (item.article || item.name));
 
-                    if (product) {
-                        await cancelPendingReturn(product.id, item.quantity || 1);
-                    }
+                if (product) {
+                    await cancelPendingReturn(product.id, item.quantity || 1);
                 }
-                toast("Statut retour annulé (Stock en attente retiré)", { icon: '↩️' });
             }
+            toast("Statut retour annulé (Stock retiré)", { icon: '↩️' });
         }
+    };
+
+    const handleStatusChange = async (orderId, newStatus) => {
+        const order = orders.find(o => o.id === orderId);
+        if (!order) return;
+
+        await applyStatusUpdate(orderId, newStatus);
 
         // Suggest WhatsApp message if status is relevant
-        // Find the order again (or construct a temp object) to show correct status in preview
-        const order = orders.find(o => o.id === orderId);
-        if (order && order.phone) {
-            // ... (rest of whatsapp logic)
+        if (order.phone) {
             const updatedOrder = { ...order, status: newStatus };
             setWhatsappOrder(updatedOrder);
             setIsWhatsAppModalOpen(true);
-            toast.success(`Statut mis à jour. Préparation du message WhatsApp...`);
+            toast.success(`Statut mis à jour. WhatsApp prêt.`);
         } else {
             toast.success("Statut mis à jour.");
         }
@@ -236,26 +270,222 @@ const Orders = () => {
         const toastId = toast.loading(`Sync ${provider}...`);
         try {
             let result;
-            let status;
+            let deliveryStatus;
 
             if (provider === 'sendit') {
                 result = await senditService.getPackageStatus(order.deliveryValues.trackingID);
-                status = result.data?.status || result.status;
+                deliveryStatus = result.data?.status || result.status;
+
+                // Automatic status mapping for Sendit
+                const mappedStatus = mapSenditStatus(deliveryStatus);
+                if (mappedStatus && mappedStatus !== order.status) {
+                    await applyStatusUpdate(order.id, mappedStatus);
+                }
             } else {
                 result = await olivraisonService.getPackageStatus(order.deliveryValues.trackingID);
-                status = result.status;
+                deliveryStatus = result.status;
             }
 
             await updateOrder(order.id, {
                 deliveryValues: {
                     ...order.deliveryValues,
-                    status: status,
+                    status: deliveryStatus,
                     lastSync: new Date().toISOString()
                 },
             });
-            toast.success(`Statut: ${status}`, { id: toastId });
+            toast.success(`Statut: ${deliveryStatus}`, { id: toastId });
         } catch (error) {
             toast.error("Erreur de synchronisation", { id: toastId });
+        }
+    };
+
+    const handleSenditBulkPickup = async () => {
+        if (selectedOrders.length === 0) return;
+
+        const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
+        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+
+        if (senditOrders.length === 0) {
+            toast.error("Aucune commande Sendit valide sélectionnée.");
+            return;
+        }
+
+        if (!window.confirm(`Confirmer la demande de ramassage pour ${senditOrders.length} colis Sendit ?`)) return;
+
+        const toastId = toast.loading("Demande de ramassage en cours...");
+        try {
+            // 1. Get Pickup Contact Info from Settings
+            const settingsSnap = await getDoc(doc(db, 'settings', 'delivery'));
+            if (!settingsSnap.exists()) throw new Error("Paramètres de livraison introuvables.");
+
+            const senditSettings = settingsSnap.data().sendit;
+            if (!senditSettings?.pickup_name || !senditSettings?.pickup_phone) {
+                throw new Error("Veuillez configurer les informations de ramassage dans les Paramètres.");
+            }
+
+            // 2. Prepare Payload
+            const trackingCodes = senditOrders.map(o => o.deliveryValues.trackingID).join(',');
+            const pickupData = {
+                district_id: senditSettings.pickup_district_id || 1,
+                name: senditSettings.pickup_name,
+                phone: senditSettings.pickup_phone,
+                address: senditSettings.pickup_address,
+                deliveries: trackingCodes
+            };
+
+            // 3. Call API
+            await senditService.requestPickup(pickupData);
+
+            // 4. Update Orders
+            for (const order of senditOrders) {
+                await updateOrder(order.id, {
+                    status: 'Ramassage',
+                    deliveryValues: {
+                        ...order.deliveryValues,
+                        pickupRequested: true,
+                        pickupRequestedAt: new Date().toISOString()
+                    }
+                });
+            }
+
+            setSelectedOrders([]);
+            toast.success("Demande de ramassage envoyée avec succès !", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur: ${error.message}`, { id: toastId });
+        }
+    };
+
+    const handleSenditBulkReturn = async () => {
+        if (selectedOrders.length === 0) return;
+
+        const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
+        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+
+        if (senditOrders.length === 0) {
+            toast.error("Aucune commande Sendit valide sélectionnée.");
+            return;
+        }
+
+        if (!window.confirm(`Confirmer la demande de RETOUR pour ${senditOrders.length} colis Sendit ?`)) return;
+
+        const toastId = toast.loading("Demande de retour en cours...");
+        try {
+            // 1. Get Pickup Contact Info (Same as pickup since it's where the rider picks up the return)
+            const settingsSnap = await getDoc(doc(db, 'settings', 'delivery'));
+            if (!settingsSnap.exists()) throw new Error("Paramètres de livraison introuvables.");
+
+            const senditSettings = settingsSnap.data().sendit;
+            if (!senditSettings?.pickup_name || !senditSettings?.pickup_phone) {
+                throw new Error("Veuillez configurer les informations de contact dans les Paramètres.");
+            }
+
+            // 2. Prepare Payload
+            const trackingCodes = senditOrders.map(o => o.deliveryValues.trackingID).join(',');
+            const returnData = {
+                district_id: senditSettings.pickup_district_id || 1,
+                name: senditSettings.pickup_name,
+                phone: senditSettings.pickup_phone,
+                address: senditSettings.pickup_address,
+                deliveries: trackingCodes
+            };
+
+            // 3. Call API
+            await senditService.requestReturn(returnData);
+
+            // 4. Update Orders
+            for (const order of senditOrders) {
+                await updateOrder(order.id, {
+                    status: 'Retour',
+                    deliveryValues: {
+                        ...order.deliveryValues,
+                        pickupRequested: true,
+                        pickupRequestedAt: new Date().toISOString(),
+                        isReturn: true
+                    }
+                });
+            }
+
+            setSelectedOrders([]);
+            toast.success("Demande de retour envoyée avec succès !", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur: ${error.message}`, { id: toastId });
+        }
+    };
+
+    const handleSenditBulkLabels = async () => {
+        if (selectedOrders.length === 0) return;
+
+        const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
+        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+
+        if (senditOrders.length === 0) {
+            toast.error("Aucune commande Sendit valide sélectionnée.");
+            return;
+        }
+
+        const toastId = toast.loading("Génération des étiquettes...");
+        try {
+            const trackingCodes = senditOrders.map(o => o.deliveryValues.trackingID).join(',');
+            // Default to thermal format (1) as requested by most sellers
+            const result = await senditService.getLabels(trackingCodes, 1);
+
+            if (result.url) {
+                window.open(result.url, '_blank');
+                toast.success("Étiquettes prêtes !", { id: toastId });
+            } else {
+                throw new Error("URL du PDF non trouvée dans la réponse");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur: ${error.message}`, { id: toastId });
+        }
+    };
+
+    const handleSenditGlobalSync = async () => {
+        const toastId = toast.loading("Synchronisation globale Sendit...");
+        try {
+            const results = await senditService.syncAllDeliveries();
+            const deliveries = results.data || results;
+
+            if (!Array.isArray(deliveries)) {
+                throw new Error("Format de réponse invalide");
+            }
+
+            let updatedCount = 0;
+            for (const item of deliveries) {
+                const trackingID = item.code || item.trackingID;
+                const deliveryStatus = item.status;
+
+                // Find local order with this trackingID
+                const localOrder = orders.find(o => o.deliveryValues?.trackingID === trackingID);
+                if (localOrder) {
+                    const mappedStatus = mapSenditStatus(deliveryStatus);
+                    let shouldUpdateMainStatus = mappedStatus && mappedStatus !== localOrder.status;
+                    let shouldUpdateDeliveryStatus = deliveryStatus !== localOrder.deliveryValues?.status;
+
+                    if (shouldUpdateMainStatus) {
+                        await applyStatusUpdate(localOrder.id, mappedStatus);
+                    }
+
+                    if (shouldUpdateMainStatus || shouldUpdateDeliveryStatus) {
+                        await updateOrder(localOrder.id, {
+                            deliveryValues: {
+                                ...localOrder.deliveryValues,
+                                status: deliveryStatus,
+                                lastSync: new Date().toISOString()
+                            }
+                        });
+                        updatedCount++;
+                    }
+                }
+            }
+
+            toast.success(`${updatedCount} commandes synchronisées !`, { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error(`Erreur Sync: ${error.message}`, { id: toastId });
         }
     };
 
@@ -275,6 +505,16 @@ const Orders = () => {
                     <p className="text-gray-500 text-sm mt-1">Manage new, pending and delivered orders</p>
                 </div>
                 <div className="flex gap-2">
+                    {activeProviders.sendit && (
+                        <button
+                            className="px-4 py-2 rounded-lg flex items-center gap-2 bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 transition-colors shadow-sm font-medium"
+                            onClick={handleSenditGlobalSync}
+                            title="Synchroniser tous les statuts Sendit"
+                        >
+                            <RefreshCw size={18} />
+                            Sync Sendit
+                        </button>
+                    )}
                     <button
                         className={`px-4 py-2 rounded-lg flex items-center gap-2 border transition-colors ${showTrash ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                         onClick={() => setShowTrash(!showTrash)}
@@ -391,9 +631,58 @@ const Orders = () => {
             </div>
 
             <div className="card orders-table-container">
+                {/* Bulk Actions Bar */}
+                {selectedOrders.length > 0 && (
+                    <div className="bg-indigo-50 p-4 border-b border-indigo-100 flex items-center justify-between animate-fade-in">
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-indigo-700 bg-white px-3 py-1 rounded-full border border-indigo-200 shadow-sm">
+                                {selectedOrders.length} sélectionné{selectedOrders.length > 1 ? 's' : ''}
+                            </span>
+                            <button
+                                onClick={() => setSelectedOrders([])}
+                                className="text-xs text-indigo-400 hover:text-indigo-600 underline"
+                            >
+                                Tout désélectionner
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            {activeProviders.sendit && (
+                                <>
+                                    <button
+                                        onClick={handleSenditBulkPickup}
+                                        className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors shadow-sm"
+                                    >
+                                        <Truck size={16} /> Demander Ramassage (Sendit)
+                                    </button>
+                                    <button
+                                        onClick={handleSenditBulkReturn}
+                                        className="px-4 py-2 bg-rose-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-rose-600 transition-colors shadow-sm"
+                                    >
+                                        <RotateCcw size={16} /> Demander Retour (Sendit)
+                                    </button>
+                                    <button
+                                        onClick={handleSenditBulkLabels}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+                                    >
+                                        <FileText size={16} /> Imprimer Étiquettes
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <table className="orders-table">
                     <thead>
                         <tr>
+                            <th className="w-10">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedOrders.length > 0 && selectedOrders.length === filteredOrders.length}
+                                    onChange={toggleAllSelection}
+                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                            </th>
                             <th>N° Commande</th>
                             <th>Date</th>
                             <th>Client</th>
@@ -421,7 +710,15 @@ const Orders = () => {
                                 }];
 
                                 return (
-                                    <tr key={order.id} style={{ verticalAlign: 'top' }}>
+                                    <tr key={order.id} style={{ verticalAlign: 'top' }} className={selectedOrders.includes(order.id) ? 'bg-indigo-50/30' : ''}>
+                                        <td className="w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrders.includes(order.id)}
+                                                onChange={() => toggleOrderSelection(order.id)}
+                                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                        </td>
                                         <td className="font-medium">{order.displayId || order.id}</td>
                                         <td>{order.date}</td>
                                         <td>{order.customer}</td>
