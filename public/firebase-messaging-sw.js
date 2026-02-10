@@ -24,7 +24,8 @@ messaging.onBackgroundMessage((payload) => {
     const notificationTitle = payload.notification.title;
     const notificationOptions = {
         body: payload.notification.body,
-        icon: '/pwa-192x192.png' // Ensure this path is correct
+        icon: payload.notification.icon || '/pwa-192x192.png',
+        badge: payload.notification.badge || '/pwa-192x192.png'
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);

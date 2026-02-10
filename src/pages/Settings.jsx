@@ -3,7 +3,25 @@ import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Save, Lock, Truck, AlertCircle, CheckCircle } from 'lucide-react';
 import Button from '../components/Button';
-import { Tag, Calendar, Percent, ShoppingBag } from 'lucide-react';
+import { Tag, Calendar, Percent, ShoppingBag, Bell } from 'lucide-react';
+import usePushNotifications from '../hooks/usePushNotifications';
+
+const NotificationButton = () => {
+    const { requestPermission, permission } = usePushNotifications();
+
+    if (permission === 'granted') return <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={12} /> Notifs Actives</span>;
+
+    return (
+        <button
+            type="button"
+            onClick={requestPermission}
+            className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 text-xs rounded-full hover:bg-indigo-100 transition-colors"
+        >
+            <Bell size={12} />
+            Activer Notifs (iOS)
+        </button>
+    );
+};
 
 const PromotionSettings = () => {
     const [promo, setPromo] = useState({
@@ -344,6 +362,9 @@ const DeliverySettings = () => {
                                 />
                                 <span className="text-sm text-gray-600">Actif</span>
                             </label>
+
+                            <NotificationButton />
+
                             <button
                                 type="button"
                                 onClick={async () => {

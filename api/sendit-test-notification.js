@@ -72,7 +72,9 @@ export default async function handler(req, res) {
         const notificationPayload = {
             notification: {
                 title: 'Test Notification',
-                body: customMessage
+                body: customMessage,
+                icon: '/pwa-192x192.png', // Logo
+                badge: '/pwa-192x192.png' // Android Small Icon (usually needs to be monochrome, but this helps)
             },
             tokens: tokens
         };

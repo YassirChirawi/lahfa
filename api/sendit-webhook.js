@@ -113,7 +113,9 @@ async function sendPushNotification(order, newStatus) {
         const message = {
             notification: {
                 title: `Mise à jour Commande #${order.displayId || 'Inconnue'}`,
-                body: `Nouveau statut: ${newStatus}`
+                body: `Nouveau statut: ${newStatus}`,
+                icon: '/pwa-192x192.png',
+                badge: '/pwa-192x192.png'
             },
             data: {
                 orderId: order.id || '',
