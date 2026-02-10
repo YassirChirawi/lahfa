@@ -112,188 +112,175 @@ const senditService = {
                     console.log("No districts found in page", page);
                     hasMore = false;
                 } else {
-                    hasMore = false;
-                } else {
-                    allDistricts =[...allDistricts, ...districts];
+                    allDistricts = [...allDistricts, ...districts];
                     page++;
-}
-
-// Safety break to prevent infinite loops if API is weird
-if (page > 100) hasMore = false;
-            }
-
-// Map to our internal format
-return allDistricts.map(d => ({
-    id: d.id,
-    name: d.name || d.ville || "Inconnu",
-    price: parseFloat(d.price || d.tarif || 0),
-    delais: d.delais || d.delivery_time || "24h-48h",
-    ref: d.ref || d.code || null,
-    region: d.region || null
-}));
-
-        } catch (error) {
-    console.error("Get All Districts Error:", error);
-    throw error;
-}
-    },
-
-/**
- * Create a new package
- */
-createPackage: async (order) => {
-    try {
-        const token = await senditService.getToken();
-
-        // 1. Resolve District ID with Strict Validation
-        let districtId = order.deliveryValues?.districtId;
-
-        if (!districtId || isNaN(parseInt(districtId))) {
-            console.error("Missing/Invalid District ID for city:", order.city);
-            throw new Error(`La ville "${order.city}" n'est pas reconnue par Sendit. Veuillez modifier la commande et sélectionner une ville valide dans la liste déroulante.`);
-        }
-
-        // 1b. Resolve Pickup District ID
-        let pickupId = (await getCredentials()).pickup_district_id;
-
-        if (!pickupId) {
-            try {
-                // Auto-detect Casablanca
-                if (!cachedDistricts) {
-                    console.log("Fetching districts for auto-detect...");
-                    cachedDistricts = await senditService.getAllDistricts();
-                    console.log(`Fetched ${cachedDistricts.length} districts.`);
                 }
 
-                // Flexible match
-                const casa = cachedDistricts.find(d => d.name && d.name.toLowerCase().includes("casablanca"));
-
-                if (casa) {
-                    pickupId = casa.id;
-                    console.log(`✅ Auto-detected Pickup City: ${casa.name} (ID: ${pickupId})`);
-                } else {
-                    console.warn("⚠️ 'Casablanca' not found in district list. Available examples:", cachedDistricts.slice(0, 5).map(d => d.name));
-                }
-            } catch (e) {
-                console.error("Could not auto-detect pickup city:", e);
+                // Safety break to prevent infinite loops if API is weird
+                if (page > 100) hasMore = false;
             }
-        }
 
-    } catch (e) {
-        console.error("Could not auto-detect pickup city:", e);
-        // Append inner error to visible error if possible, or just log
-    }
-}
-
-if (!pickupId) {
-    const count = cachedDistricts ? cachedDistricts.length : 0;
-    const samples = cachedDistricts ? cachedDistricts.slice(0, 5).map(d => d.name).join(', ') : 'Aucune';
-
-    throw new Error(`Impossible de trouver l'ID de Casablanca (Pickup). ${count} villes trouvées. Premières villes: ${samples}. Vérifiez la connexion ou contactez le support.`);
-}
-
-// 2. Prepare Product String (Robust Fallback)
-let productsString = "";
-if (order.items && order.items.length > 0) {
-    productsString = order.items.map(item => {
-        let cleanName = (item.article || "ITEM").replace(/[^a-zA-Z0-9]/g, '');
-        if (!cleanName) cleanName = "ITEM";
-        const code = cleanName.substring(0, 10).toUpperCase();
-        return `${code}:${item.quantity || 1}`;
-    }).join(';');
-} else {
-    productsString = "ITEM:1";
-}
-
-// 3. Construct Payload
-const payload = {
-    district_id: parseInt(districtId),
-    pickup_district_id: parseInt(pickupId),
-    name: order.customer || "Client",
-    phone: order.phone || "",
-    address: order.address || order.city || "Adresse inconnue",
-    amount: parseFloat(order.amount) || 0,
-    note: order.notes || "",
-    products: productsString,
-    // Options d'essayage et d'échange
-    is_try: order.deliveryValues?.allowTry ? 1 : 0,
-    is_open: order.deliveryValues?.allowOpen ? 1 : 0, // Certain APIs use is_open
-    is_exchange: order.deliveryValues?.isExchange ? 1 : 0,
-};
-
-console.log("🚀 Payload Sendit:", JSON.stringify(payload, null, 2));
-
-console.log("Creating Sendit Package:", payload);
-
-const response = await fetch(`${API_BASE_URL}/deliveries`, {
-    method: 'POST',
-    headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    },
-    body: JSON.stringify(payload)
-});
-
-const result = await response.json();
-
-if (!response.ok) {
-    console.error("Sendit Create Error:", result);
-    let errorMessage = result.message || "Erreur lors de la création du colis Sendit";
-    if (result.errors) {
-        // Laravel style validation errors
-        const details = Object.entries(result.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
-        errorMessage = `${errorMessage} \n Détails: ${details}`;
-    }
-    throw new Error(errorMessage);
-}
-
-// Success. We need tracking ID.
-// Assuming result.code or result.data.code
-const trackingCode = result.code || result.data?.code;
-
-return {
-    trackingID: trackingCode,
-    status: result.status || result.data?.status || 'PENDING',
-    trackingUrl: result.label_url || result.data?.label_url
-};
+            // Map to our internal format
+            return allDistricts.map(d => ({
+                id: d.id,
+                name: d.name || d.ville || "Inconnu",
+                price: parseFloat(d.price || d.tarif || 0),
+                delais: d.delais || d.delivery_time || "24h-48h",
+                ref: d.ref || d.code || null,
+                region: d.region || null
+            }));
 
         } catch (error) {
-    console.error("Sendit Create Package Error:", error);
-    throw error;
-}
+            console.error("Get All Districts Error:", error);
+            throw error;
+        }
     },
 
-/**
- * Get package status
- */
-getPackageStatus: async (trackingID) => {
-    try {
-        const token = await senditService.getToken();
-        const response = await fetch(`${API_BASE_URL}/deliveries/${trackingID}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json'
+    /**
+     * Create a new package
+     */
+    createPackage: async (order) => {
+        try {
+            const token = await senditService.getToken();
+
+            // 1. Resolve District ID with Strict Validation
+            let districtId = order.deliveryValues?.districtId;
+
+            if (!districtId || isNaN(parseInt(districtId))) {
+                console.error("Missing/Invalid District ID for city:", order.city);
+                throw new Error(`La ville "${order.city}" n'est pas reconnue par Sendit. Veuillez modifier la commande et sélectionner une ville valide dans la liste déroulante.`);
             }
-        });
 
-        if (!response.ok) {
-            throw new Error("Impossible de récupérer le statut Sendit");
+            // 1b. Resolve Pickup District ID
+            let pickupId = (await getCredentials()).pickup_district_id;
+
+            if (!pickupId) {
+                try {
+                    // Auto-detect Casablanca
+                    if (!cachedDistricts) {
+                        console.log("Fetching districts for auto-detect...");
+                        cachedDistricts = await senditService.getAllDistricts();
+                        console.log(`Fetched ${cachedDistricts.length} districts.`);
+                    }
+
+                    // Flexible match
+                    const casa = cachedDistricts.find(d => d.name && d.name.toLowerCase().includes("casablanca"));
+
+                    if (casa) {
+                        pickupId = casa.id;
+                        console.log(`✅ Auto-detected Pickup City: ${casa.name} (ID: ${pickupId})`);
+                    } else {
+                        console.warn("⚠️ 'Casablanca' not found in district list. Available examples:", cachedDistricts.slice(0, 5).map(d => d.name));
+                    }
+                } catch (e) {
+                    console.error("Could not auto-detect pickup city:", e);
+                }
+            }
+
+            if (!pickupId) {
+                const count = cachedDistricts ? cachedDistricts.length : 0;
+                const samples = cachedDistricts ? cachedDistricts.slice(0, 5).map(d => d.name).join(', ') : 'Aucune';
+
+                throw new Error(`Impossible de trouver l'ID de Casablanca (Pickup). ${count} villes trouvées. Premières villes: ${samples}. Vérifiez la connexion ou contactez le support.`);
+            }
+
+            // 2. Prepare Product String (Robust Fallback)
+            let productsString = "";
+            if (order.items && order.items.length > 0) {
+                productsString = order.items.map(item => {
+                    let cleanName = (item.article || "ITEM").replace(/[^a-zA-Z0-9]/g, '');
+                    if (!cleanName) cleanName = "ITEM";
+                    const code = cleanName.substring(0, 10).toUpperCase();
+                    return `${code}:${item.quantity || 1}`;
+                }).join(';');
+            } else {
+                productsString = "ITEM:1";
+            }
+
+            // 3. Construct Payload
+            const payload = {
+                district_id: parseInt(districtId),
+                pickup_district_id: parseInt(pickupId),
+                name: order.customer || "Client",
+                phone: order.phone || "",
+                address: order.address || order.city || "Adresse inconnue",
+                amount: parseFloat(order.amount) || 0,
+                note: order.notes || "",
+                products: productsString,
+                is_try: order.deliveryValues?.allowTry ? 1 : 0,
+                is_open: order.deliveryValues?.allowOpen ? 1 : 0,
+                is_exchange: order.deliveryValues?.isExchange ? 1 : 0,
+            };
+
+            console.log("Creating Sendit Package:", payload);
+
+            const response = await fetch(`${API_BASE_URL}/deliveries`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error("Sendit Create Error:", result);
+                let errorMessage = result.message || "Erreur lors de la création du colis Sendit";
+                if (result.errors) {
+                    const details = Object.entries(result.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+                    errorMessage = `${errorMessage} \n Détails: ${details}`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const trackingCode = result.code || result.data?.code;
+
+            return {
+                trackingID: trackingCode,
+                status: result.status || result.data?.status || 'PENDING',
+                trackingUrl: result.label_url || result.data?.label_url
+            };
+
+        } catch (error) {
+            console.error("Sendit Create Package Error:", error);
+            throw error;
         }
+    },
 
-        const result = await response.json();
+    /**
+     * Get package status
+     */
+    getPackageStatus: async (trackingID) => {
+        try {
+            if (!trackingID) throw new Error("Tracking ID is required");
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/deliveries/${trackingID}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
 
-        // Expected: { code: "...", status: "...", ... }
-        return {
-            status: result.status || result.data?.status,
-            raw: result
-        };
-    } catch (error) {
-        console.error("Sendit Get Status Error:", error);
-        throw error;
-    }
-},
+            if (!response.ok) {
+                throw new Error("Impossible de récupérer le statut Sendit");
+            }
+
+            const result = await response.json();
+
+            // Expected: { code: "...", status: "...", ... }
+            return {
+                status: result.status || result.data?.status,
+                raw: result
+            };
+        } catch (error) {
+            console.error("Sendit Get Status Error:", error);
+            throw error;
+        }
+    },
 
     /**
      * Cancel package

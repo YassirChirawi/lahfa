@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -6,12 +6,20 @@ import '../styles/layout.css';
 
 import { Toaster } from 'react-hot-toast';
 import useOrderPolling from '../hooks/useOrderPolling';
+import usePushNotifications from '../hooks/usePushNotifications';
 
 const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   // Start polling for order status updates
   useOrderPolling();
+
+  const { requestPermission, permission } = usePushNotifications();
+  useEffect(() => {
+    if (permission === 'default') {
+      requestPermission();
+    }
+  }, [permission]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);

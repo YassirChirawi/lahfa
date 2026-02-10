@@ -5,76 +5,93 @@ import toast from 'react-hot-toast';
 
 const POLL_INTERVAL = 30 * 1000; // 30 seconds for near-instant updates
 
-const useOrderPolling = () => {
+// ... (imports remain the same)
+
+const useOrderPolling = (options = {}) => {
     const { orders, updateOrder } = useOrders();
     const ordersRef = useRef(orders);
 
-    // Keep ref in sync to use latest orders in interval without resetting it
+    // Keep ref in sync
     useEffect(() => {
         ordersRef.current = orders;
     }, [orders]);
 
-    useEffect(() => {
-        const checkStatuses = async () => {
-            const activeOrders = ordersRef.current.filter(order =>
-                order.deliveryValues?.trackingID &&
-                order.status === 'Ramassage' && // Only check active shipping status
-                !order.deleted
-            );
+    const checkStatuses = async () => {
+        const activeOrders = ordersRef.current.filter(order =>
+            order.deliveryValues?.trackingID &&
+            ['Ramassage', 'Packing', 'Livraison'].includes(order.status) && // Expanded status check slightly? Or keep strict? 
+            // Original only checked 'Ramassage'. User wants updates. 'Livraison' also makes sense to check. 
+            // Let's stick to original logic unless asked, but maybe expand to 'Livraison' if provider supports it.
+            // Actually, let's keep it safe and stick to what it was or slightly expand if safe. 
+            // Original: order.status === 'Ramassage'
+            // Let's allow 'Ramassage' and 'Livraison' as these are active shipping states.
+            // Actually, let's just stick to the original logic for now to avoid regressions, 
+            // BUT allow the manual trigger to check more if needed.
+            // For now, I'll keep the logic mostly same but exported.
 
-            if (activeOrders.length === 0) return;
+            // WAIT - original code: order.status === 'Ramassage'. 
+            // If I change this, I might break flow. I will keep it as is for now, but ensure the function is robust.
+            order.status === 'Ramassage' &&
+            !order.deleted
+        );
 
-            console.log(`Polling status for ${activeOrders.length} orders...`);
+        if (activeOrders.length === 0) {
+            console.log("No active orders to poll.");
+            return 0;
+        }
 
-            for (const order of activeOrders) {
-                try {
-                    const trackingID = order.deliveryValues.trackingID;
-                    const provider = order.deliveryValues.provider || 'olivraison'; // Default for backward compatibility
+        console.log(`Polling status for ${activeOrders.length} orders...`);
+        let updatesCount = 0;
 
-                    let result;
-                    if (provider === 'sendit') {
-                        // Lazy import or assume global Sendit service availability? 
-                        // Better to import it at top. Assuming it's imported as `senditService`.
-                        const { default: senditService } = await import('../services/senditService'); // Dynamic import to avoid circular dep issues if any, or just clean
-                        result = await senditService.getPackageStatus(trackingID);
-                    } else {
-                        result = await getPackageStatus(trackingID); // olivraison
-                    }
+        for (const order of activeOrders) {
+            try {
+                const trackingID = order.deliveryValues.trackingID;
+                const provider = order.deliveryValues.provider || 'olivraison';
 
-                    // Check if status changed
-                    // Mapping Olivraison status to local status if needed, or just notifying
-                    const oldStatus = order.deliveryValues.status;
-                    const newStatus = result.status;
-
-                    if (newStatus && newStatus !== oldStatus) {
-                        console.log(`Order ${order.id} (${provider}) status changed: ${oldStatus} -> ${newStatus}`);
-
-                        // Update local order
-                        await updateOrder(order.id, {
-                            deliveryValues: {
-                                ...order.deliveryValues,
-                                status: newStatus,
-                                lastChecked: new Date().toISOString()
-                            }
-                        });
-
-                        // Send Notification
-                        if (Notification.permission === 'granted') {
-                            new Notification(`Mise à jour Commande #${order.displayId || order.id}`, {
-                                body: `Nouveau statut (${provider}): ${newStatus}`,
-                                icon: '/pwa-192x192.png'
-                            });
-                        } else {
-                            toast.success(`Commande #${order.displayId || order.id}: ${newStatus}`, {
-                                icon: '🚚'
-                            });
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Failed to check status for order ${order.id}`, error);
+                let result;
+                if (provider === 'sendit') {
+                    const { default: senditService } = await import('../services/senditService');
+                    result = await senditService.getPackageStatus(trackingID);
+                } else {
+                    result = await getPackageStatus(trackingID);
                 }
+
+                const oldStatus = order.deliveryValues.status; // This is the delivery status, not order status
+                const newStatus = result.status;
+
+                if (newStatus && newStatus !== oldStatus) {
+                    console.log(`Order ${order.id} (${provider}) status changed: ${oldStatus} -> ${newStatus}`);
+
+                    await updateOrder(order.id, {
+                        deliveryValues: {
+                            ...order.deliveryValues,
+                            status: newStatus,
+                            lastChecked: new Date().toISOString()
+                        }
+                    });
+                    updatesCount++;
+
+                    if (Notification.permission === 'granted') {
+                        new Notification(`Mise à jour Commande #${order.displayId || order.id}`, {
+                            body: `Nouveau statut (${provider}): ${newStatus}`,
+                            icon: '/pwa-192x192.png'
+                        });
+                    } else {
+                        toast.success(`Commande #${order.displayId || order.id}: ${newStatus}`, {
+                            icon: '🚚'
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to check status for order ${order.id}`, error);
             }
-        };
+        }
+        return updatesCount;
+    };
+
+    useEffect(() => {
+        // Skip interval if manual only
+        if (options.manualOnly) return;
 
         // Request permission on mount
         if (Notification.permission === 'default') {
@@ -82,13 +99,12 @@ const useOrderPolling = () => {
         }
 
         const intervalId = setInterval(checkStatuses, POLL_INTERVAL);
-
-        // Initial check after 5 seconds to catch updates on load (optional, maybe skip to avoid spam)
-        // Initial check after 1 second to catch updates on load
         setTimeout(checkStatuses, 1000);
 
         return () => clearInterval(intervalId);
-    }, []); // Empty dependency array to run effect once (using ref for orders)
+    }, [options.manualOnly]); // Add dependency
+
+    return { checkStatuses };
 };
 
 export default useOrderPolling;
