@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2 } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
 import senditService from '../services/senditService';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import '../styles/orders.css';
 import '../styles/modal.css';
@@ -503,6 +503,26 @@ const Orders = () => {
     };
 
 
+    const handleManualLink = async (order) => {
+        const trackingId = window.prompt("Entrez le Code de Suivi Sendit (ex: DH... ou SNDT...) :");
+        if (!trackingId) return;
+
+        const toastId = toast.loading("Liaison en cours...");
+        try {
+            const orderRef = doc(db, 'orders', order.id);
+            await updateDoc(orderRef, {
+                'deliveryValues.provider': 'sendit',
+                'deliveryValues.trackingID': trackingId,
+                'deliveryValues.status': 'En attente',
+                'deliveryValues.lastSync': new Date().toISOString()
+            });
+            toast.success("Commande liée manuellement !", { id: toastId });
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la liaison : " + e.message, { id: toastId });
+        }
+    };
+
     return (
         <div className="orders-page">
             <MessagePreviewModal
@@ -811,6 +831,15 @@ const Orders = () => {
                                                                         S
                                                                     </button>
                                                                 )}
+
+                                                                {/* Manual Link Button */}
+                                                                <button
+                                                                    className="icon-btn-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                                                                    onClick={() => handleManualLink(order)}
+                                                                    title="Lier manuellement un Tracking ID"
+                                                                >
+                                                                    <Link2 size={16} />
+                                                                </button>
                                                             </div>
                                                         ) : (
                                                             <>
