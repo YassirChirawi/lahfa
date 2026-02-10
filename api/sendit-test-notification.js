@@ -1,5 +1,7 @@
 // api/sendit-test-notification.js
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
 export default async function handler(req, res) {
     // Enable CORS
@@ -17,9 +19,10 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    try {
-        // Initialize Firebase Admin SDK INSIDE handler to catch errors
-        if (!admin.apps.length) {
+    // Initialize Firebase Admin SDK INSIDE handler to catch errors
+    // Use modular getApps() instead of admin.apps
+    if (getApps().length === 0) {
+        try {
             const serviceAccountData = process.env.FIREBASE_SERVICE_ACCOUNT;
             if (!serviceAccountData) {
                 throw new Error("FIREBASE_SERVICE_ACCOUNT env var is missing");
@@ -35,13 +38,22 @@ export default async function handler(req, res) {
                 throw new Error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON: " + parseError.message);
             }
 
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+            initializeApp({
+                credential: cert(serviceAccount)
+            });
+        } catch (e) {
+            console.error("Firebase Admin Init Error:", e);
+            return res.status(500).json({
+                message: 'Firebase Admin Init Failed',
+                error: e.toString(),
+                envVarExists: !!process.env.FIREBASE_SERVICE_ACCOUNT
             });
         }
+    }
 
-        const db = admin.firestore();
-        const messaging = admin.messaging();
+    try {
+        const db = getFirestore();
+        const messaging = getMessaging();
         const { message } = req.body;
         const customMessage = message || "test notif a ziiiin";
 
