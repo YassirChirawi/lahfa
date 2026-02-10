@@ -334,15 +334,36 @@ const DeliverySettings = () => {
                 <div className="border-t border-gray-100 pt-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="font-medium text-gray-900 border-l-4 border-orange-500 pl-3">Sendit.ma</h3>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="w-4 h-4 text-orange-600 rounded"
-                                checked={settings.sendit.active}
-                                onChange={e => handleChange('sendit', 'active', e.target.checked)}
-                            />
-                            <span className="text-sm text-gray-600">Actif</span>
-                        </label>
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 text-orange-600 rounded"
+                                    checked={settings.sendit.active}
+                                    onChange={e => handleChange('sendit', 'active', e.target.checked)}
+                                />
+                                <span className="text-sm text-gray-600">Actif</span>
+                            </label>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        await fetch('/api/sendit-test-notification', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            // eslint-disable-next-line
+                                            body: JSON.stringify({ message: "test notif a ziiiin" })
+                                        });
+                                        alert("Notif envoyée !");
+                                    } catch (e) {
+                                        alert("Erreur: " + e.message);
+                                    }
+                                }}
+                                className="text-xs text-gray-400 hover:text-gray-600 underline"
+                            >
+                                Test Notif
+                            </button>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input
@@ -387,7 +408,7 @@ const DeliverySettings = () => {
                     </Button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
