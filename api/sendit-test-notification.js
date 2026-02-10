@@ -1,23 +1,6 @@
 // api/sendit-test-notification.js
 import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK
-// We do this check first to avoid issues
-if (!admin.apps.length) {
-    try {
-        if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-            console.error("FIREBASE_SERVICE_ACCOUNT variable is missing!");
-        } else {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-        }
-    } catch (e) {
-        console.error("Firebase Admin Init Error:", e);
-    }
-}
-
 export default async function handler(req, res) {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -34,18 +17,31 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    // Diagnostic check
-    if (!admin.apps.length) {
-        return res.status(500).json({
-            message: 'Firebase Admin not initialized. Likely missing FIREBASE_SERVICE_ACCOUNT env var.',
-            envVarExists: !!process.env.FIREBASE_SERVICE_ACCOUNT
-        });
-    }
-
-    const db = admin.firestore();
-    const messaging = admin.messaging();
-
     try {
+        // Initialize Firebase Admin SDK INSIDE handler to catch errors
+        if (!admin.apps.length) {
+            const serviceAccountData = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (!serviceAccountData) {
+                throw new Error("FIREBASE_SERVICE_ACCOUNT env var is missing");
+            }
+
+            // Handle both stringified JSON and potential object anomalies
+            let serviceAccount;
+            try {
+                serviceAccount = typeof serviceAccountData === 'string'
+                    ? JSON.parse(serviceAccountData)
+                    : serviceAccountData;
+            } catch (parseError) {
+                throw new Error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON: " + parseError.message);
+            }
+
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
+
+        const db = admin.firestore();
+        const messaging = admin.messaging();
         const { message } = req.body;
         const customMessage = message || "test notif a ziiiin";
 
@@ -81,9 +77,10 @@ export default async function handler(req, res) {
     } catch (error) {
         console.error("Test Notification Error:", error);
         return res.status(500).json({
-            message: 'Error sending test notification',
+            message: 'Error executing test notification',
             error: error.toString(),
-            stack: error.stack
+            stack: error.stack,
+            envVarExists: !!process.env.FIREBASE_SERVICE_ACCOUNT
         });
     }
 }
