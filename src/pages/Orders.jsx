@@ -467,12 +467,44 @@ const Orders = () => {
             }
 
             let updatedCount = 0;
+            let linkedCount = 0;
+
             for (const item of deliveries) {
                 const trackingID = item.code || item.trackingID;
                 const deliveryStatus = item.status;
+                const reference = item.reference; // Reference sent to Sendit (usually order.displayId or order.id)
 
-                // Find local order with this trackingID
-                const localOrder = orders.find(o => o.deliveryValues?.trackingID === trackingID);
+                // 1. Find local order by Tracking ID (Priority)
+                let localOrder = orders.find(o => o.deliveryValues?.trackingID === trackingID);
+
+                // 2. If not found, Try Smart Link by Reference
+                // Only if the local order is NOT already linked to another tracking ID
+                if (!localOrder && reference) {
+                    localOrder = orders.find(o =>
+                        (o.displayId === reference || o.id === reference) &&
+                        !o.deliveryValues?.trackingID
+                    );
+
+                    if (localOrder) {
+                        console.log(`🔗 Auto-Link: Commande ${localOrder.displayId || localOrder.id} liée au Tracking ${trackingID}`);
+
+                        // Link immediately
+                        await updateOrder(localOrder.id, {
+                            deliveryValues: {
+                                provider: 'sendit',
+                                trackingID: trackingID,
+                                status: deliveryStatus,
+                                lastSync: new Date().toISOString(),
+                                autoLinked: true
+                            }
+                        });
+                        linkedCount++;
+                        // Update local object to allow status update in next block
+                        localOrder = { ...localOrder, deliveryValues: { ...localOrder.deliveryValues, trackingID, status: deliveryStatus } };
+                    }
+                }
+
+                // 3. Update Status if matched (either previously or just now)
                 if (localOrder) {
                     const mappedStatus = mapSenditStatus(deliveryStatus);
                     let shouldUpdateMainStatus = mappedStatus && mappedStatus !== localOrder.status;
@@ -483,6 +515,7 @@ const Orders = () => {
                     }
 
                     if (shouldUpdateMainStatus || shouldUpdateDeliveryStatus) {
+                        // Avoid double update if we just linked it, but ensure status is fresh
                         await updateOrder(localOrder.id, {
                             deliveryValues: {
                                 ...localOrder.deliveryValues,
@@ -495,7 +528,10 @@ const Orders = () => {
                 }
             }
 
-            toast.success(`${updatedCount} commandes synchronisées !`, { id: toastId });
+            let msg = `${updatedCount} commandes mises à jour.`;
+            if (linkedCount > 0) msg += ` ${linkedCount} nouvelles liaisons auto !`;
+
+            toast.success(msg, { id: toastId });
         } catch (error) {
             console.error(error);
             toast.error(`Erreur Sync: ${error.message}`, { id: toastId });
