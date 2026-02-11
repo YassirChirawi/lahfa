@@ -35,12 +35,16 @@ const mapSenditStatus = (senditStatus) => {
         'POSTPONED': 'Pas de réponse client',
         'REPORTÉ': 'Pas de réponse client',
         'PICKED_UP': 'Ramassage',
+        'PICKEDUP': 'Ramassage', // Added
+        'TO_PICKUP': 'Ramassage', // Added
         'RAMASSÉ': 'Ramassage',
         'WAREHOUSE': 'Ramassage',
         'ENTREPÔT': 'Ramassage',
         'TRANSIT': 'Ramassage',
         'EN TRANSIT': 'Ramassage',
-        'CREATED': 'Ramassage'
+        'CREATED': 'Ramassage',
+        'PENDING': 'Ramassage', // Added
+        'TO_PREPARE': 'Ramassage' // Added
     };
     return statusMap[normalized] || null;
 };
