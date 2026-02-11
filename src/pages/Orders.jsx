@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2 } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2, MapPin } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
@@ -14,6 +14,7 @@ import '../styles/orders.css';
 import '../styles/modal.css';
 
 import MessagePreviewModal from '../components/MessagePreviewModal';
+import TrackingTimelineModal from '../components/TrackingTimelineModal'; // Added
 
 const mapSenditStatus = (senditStatus) => {
     if (!senditStatus) return null;
@@ -68,6 +69,11 @@ const Orders = () => {
     // WhatsApp Modal State
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [whatsappOrder, setWhatsappOrder] = useState(null);
+
+    // Tracking Modal State
+    const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+    const [trackingData, setTrackingData] = useState(null);
+    const [trackingProvider, setTrackingProvider] = useState(null);
 
     // Active Providers State
     const [activeProviders, setActiveProviders] = useState({ olivraison: false, sendit: false });
@@ -127,6 +133,33 @@ const Orders = () => {
             case 'Retour': return 'status-danger';
             case 'Pas de réponse client': return 'status-default';
             default: return 'status-default';
+        }
+    };
+
+    const handleOpenTracking = async (order) => {
+        if (!order.deliveryValues?.trackingID) return;
+        const provider = order.deliveryValues.provider || 'olivraison';
+        const trackingID = order.deliveryValues.trackingID;
+
+        const toastId = toast.loading("Chargement de l'historique...");
+        try {
+            let data;
+            if (provider === 'sendit') {
+                const result = await senditService.getPackageStatus(trackingID);
+                data = result.raw || result;
+            } else {
+                // Mock or implement Olivraison history if available
+                data = { history: [] };
+                toast("Historique détaillé non disponible pour Olivraison", { icon: 'ℹ️' });
+            }
+
+            setTrackingData(data);
+            setTrackingProvider(provider);
+            setIsTrackingModalOpen(true);
+            toast.dismiss(toastId);
+        } catch (error) {
+            console.error(error);
+            toast.error("Impossible de récupérer l'historique", { id: toastId });
         }
     };
 
@@ -572,6 +605,13 @@ const Orders = () => {
                 initialLang={whatsappLang}
             />
 
+            <TrackingTimelineModal
+                isOpen={isTrackingModalOpen}
+                onClose={() => setIsTrackingModalOpen(false)}
+                trackingData={trackingData}
+                provider={trackingProvider}
+            />
+
             <div className="page-header">
                 <div>
                     <h1>Orders</h1>
@@ -891,14 +931,11 @@ const Orders = () => {
                                                                     <RefreshCw size={16} />
                                                                 </button>
                                                                 <button
-                                                                    className="icon-btn-sm text-gray-500 hover:bg-gray-100"
-                                                                    onClick={() => {
-                                                                        const details = `📦 Détails Livraison\n------------------\nFournisseur: ${order.deliveryValues.provider}\nTracking ID: ${order.deliveryValues.trackingID}\nStatut: ${order.deliveryValues.status}\nDernière Sync: ${order.deliveryValues.lastSync ? new Date(order.deliveryValues.lastSync).toLocaleString() : 'Jamais'}`;
-                                                                        alert(details);
-                                                                    }}
-                                                                    title="Voir détails tracking"
+                                                                    className="icon-btn-sm text-blue-500 hover:bg-blue-100"
+                                                                    onClick={() => handleOpenTracking(order)}
+                                                                    title="Voir l'historique détaillé"
                                                                 >
-                                                                    <Eye size={16} />
+                                                                    <MapPin size={16} />
                                                                 </button>
                                                             </>
                                                         )}
