@@ -90,7 +90,7 @@ const Finances = () => {
     // --- Helpers ---
     const calculateStats = (filteredOrders, filteredExpenses) => {
         const revenue = filteredOrders.reduce((sum, o) => {
-            if (o.status === 'Livré') {
+            if (o.status === 'Livré' || o.status === 'Livré Partiellement') {
                 const amount = parseFloat(o.amount) || 0;
                 const delivery = parseFloat(o.deliveryFee) || 0;
                 return sum + Math.max(0, amount - delivery);
@@ -134,7 +134,8 @@ const Finances = () => {
     }));
 
     const totalPendingRevenue = orders.reduce((sum, o) => {
-        if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
+        const finalStatuses = ['Livré', 'Livré Partiellement', 'Retour', 'Annulé', 'Refusé', 'À changer'];
+        if (!finalStatuses.includes(o.status)) {
             const amount = parseFloat(o.amount) || 0;
             const delivery = parseFloat(o.deliveryFee) || 0;
             return sum + Math.max(0, amount - delivery);
@@ -184,8 +185,8 @@ const Finances = () => {
             const dayLabel = date.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' });
 
             const dailyRevenue = orders
-                .filter(o => o.date === dateStr && o.status === 'Livré')
-                .reduce((sum, o) => sum + (parseFloat(o.amount) || 0) - (parseFloat(o.deliveryFee) || 0), 0);
+                .filter(o => o.date === dateStr && (o.status === 'Livré' || o.status === 'Livré Partiellement'))
+                .reduce((sum, o) => sum + Math.max(0, (parseFloat(o.amount) || 0) - (parseFloat(o.deliveryFee) || 0)), 0);
             data.push({ name: dayLabel, revenue: dailyRevenue });
         }
         return data;
