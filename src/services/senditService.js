@@ -418,6 +418,73 @@ const senditService = {
     },
 
     /**
+     * Get list of pickups
+     */
+    getPickups: async (page = 1) => {
+        try {
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/pickups?page=${page}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            let result = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Pickups response:", responseText);
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(result.message || `Erreur lors de la récupération des ramassages (${response.status})`);
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Sendit Get Pickups Error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Cancel a pickup request
+     */
+    cancelPickup: async (pickupId) => {
+        try {
+            const token = await senditService.getToken();
+            const response = await fetch(`${API_BASE_URL}/pickups/${pickupId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                let result = {};
+                const responseText = await response.text();
+                if (responseText) {
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (e) { }
+                }
+                throw new Error(result.message || `Impossible d'annuler le ramassage (${response.status})`);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Sendit Cancel Pickup Error:", error);
+            throw error;
+        }
+    },
+
+    /**
      * Request a return (Retour)
      */
     requestReturn: async (returnData) => {
@@ -633,6 +700,8 @@ export const getAllDistricts = senditService.getAllDistricts;
 export const requestPickup = senditService.requestPickup;
 export const requestReturn = senditService.requestReturn;
 export const getLabels = senditService.getLabels;
+export const getPickups = senditService.getPickups;
+export const cancelPickup = senditService.cancelPickup;
 export const syncAllDeliveries = senditService.syncAllDeliveries;
 export const getInvoices = senditService.getInvoices;
 export default senditService;

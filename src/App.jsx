@@ -15,6 +15,7 @@ import { ProductProvider } from './context/ProductContext';
 import Products from './pages/Products';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import Pickups from './pages/Pickups';
 import Catalogue from './pages/Catalogue'; // Import Public Catalogue
 
 import { SecurityProvider, useSecurity } from './context/SecurityContext';
@@ -49,6 +50,7 @@ const AppContent = () => {
             <Route path="products" element={<Products />} />
             <Route path="history" element={<History />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="pickups" element={<Pickups />} />
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
