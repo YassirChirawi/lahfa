@@ -941,7 +941,7 @@ const Orders = () => {
                                                         )}
 
                                                         <button
-                                                            className="icon-btn-sm text-red-500 hover:bg-red-50"
+                                                            className="icon-btn-sm text-red-500 hover:bg-red-50 ml-8"
                                                             onClick={async () => {
                                                                 if (order.deliveryValues?.trackingID) {
                                                                     if (window.confirm(`Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`)) {
