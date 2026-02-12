@@ -5,23 +5,21 @@ import { DollarSign, ShoppingBag, TrendingUp, Users, Activity, FileText } from '
 import { generateInvoice } from '../utils/generateInvoice';
 import '../styles/orders.css';
 import MessagePreviewModal from '../components/MessagePreviewModal';
+import { useNavigate } from 'react-router-dom';
+import { getStatusColor } from '../utils/statusStyles';
 
 const Dashboard = () => {
-    const { orders, updateOrderStatus } = useOrders();
+    const { orders } = useOrders();
+    const navigate = useNavigate();
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [whatsappOrder, setWhatsappOrder] = useState(null);
-    // Determine default language logic? Dashboard might not have the toggle. 
-    // We can default to 'fr' or assume Modal handles it (it defaults to 'fr').
-    // Use a fixed default 'fr' for now as Dashboard doesn't have the toggle UI like Orders page.
 
-    // Filter out deleted orders for all metrics and display
-    const activeOrdersList = orders.filter(o => !o.deleted);
+    // Filter out deleted orders
+    const validOrders = orders.filter(o => !o.deleted);
 
-    // Calculate Metrics
-    // Revenue: Livré (+) - Retour (-) 
-    // Note: This logic duplicates Finances.jsx. Ideally move to Context.
-    const totalRevenue = activeOrdersList.reduce((sum, order) => {
-        if (order.status === 'Livré') {
+    // 1. Total Revenue (Net after delivery fee) -- Only 'Livré' counts as real money
+    const totalRevenue = validOrders.reduce((sum, order) => {
+        if (order.status === 'Livré' || (order.status === 'Livré Partiellement')) {
             const amount = parseFloat(order.amount) || 0;
             const delivery = parseFloat(order.deliveryFee) || 0;
             return sum + Math.max(0, amount - delivery);
@@ -29,30 +27,25 @@ const Dashboard = () => {
         return sum;
     }, 0);
 
-    const totalOrders = activeOrdersList.length;
-    // Active orders: everything not delivered, returned or cancelled (simplification)
-    const activeOrdersCount = activeOrdersList.filter(o => ['Packing', 'Ramassage', 'Livraison'].includes(o.status)).length;
+    const totalOrders = validOrders.length;
 
-    // Total Pending Revenue
+    // 2. Pending / Active Logic
+    // Everything that is NOT final (Livré, Retour, Annulé...) is considered "Pending/Active"
+    // This catches 'En transit', 'À préparer', 'Ramassage', etc.
+    const finalStatuses = ['Livré', 'Livré Partiellement', 'Retour', 'Annulé', 'Refusé', 'À changer'];
+    const activeOrdersList = validOrders.filter(o => !finalStatuses.includes(o.status));
+
+    const activeOrdersCount = activeOrdersList.length;
+
+    // 3. Pending Potential Revenue
     const totalPendingRevenue = activeOrdersList.reduce((sum, o) => {
-        if (['Packing', 'Ramassage', 'Livraison'].includes(o.status)) {
-            const amount = parseFloat(o.amount) || 0;
-            const delivery = parseFloat(o.deliveryFee) || 0;
-            return sum + Math.max(0, amount - delivery);
-        }
-        return sum;
+        const amount = parseFloat(o.amount) || 0;
+        const delivery = parseFloat(o.deliveryFee) || 0;
+        return sum + Math.max(0, amount - delivery);
     }, 0);
 
-    const handleStatusChange = (orderId, newStatus) => {
-        updateOrderStatus(orderId, newStatus);
-
-        // Trigger WhatsApp Modal
-        const order = orders.find(o => o.id === orderId);
-        if (order && order.phone) {
-            const updatedOrder = { ...order, status: newStatus };
-            setWhatsappOrder(updatedOrder);
-            setIsWhatsAppModalOpen(true);
-        }
+    const handleRowClick = (orderId) => {
+        navigate('/orders', { state: { highlightId: orderId } });
     };
 
     return (
@@ -64,7 +57,7 @@ const Dashboard = () => {
                 initialLang='fr'
             />
 
-            <h1 className="text-2xl font-bold mb-6" style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Dashboard Overview</h1>
+            <h1 className="text-2xl font-bold mb-6" style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Tableau de Bord</h1>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <KPICard
@@ -75,7 +68,7 @@ const Dashboard = () => {
                     icon={DollarSign}
                 />
                 <KPICard
-                    title="Pending Total"
+                    title="Montant en cours (Estimé)"
                     value={`${totalPendingRevenue.toFixed(2)} DH`}
                     change="-"
                     trend="up"
@@ -112,36 +105,33 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {activeOrdersList.slice(0, 10).map(order => { // Limit to recent 10 for better dashboard view? or show all non-deleted? Original showed all. keeping logic similar but filtered.
+                            {validOrders.slice(0, 10).map(order => {
                                 const items = order.items || [{ article: order.article }];
                                 const displayArticle = items[0]?.article || '-';
                                 const moreCount = items.length > 1 ? ` (+${items.length - 1})` : '';
 
                                 return (
-                                    <tr key={order.id}>
+                                    <tr
+                                        key={order.id}
+                                        onClick={() => handleRowClick(order.id)}
+                                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                                    >
                                         <td className="text-gray-500">{order.date || '-'}</td>
                                         <td className="font-medium">{order.customer}</td>
                                         <td>{displayArticle}{moreCount}</td>
                                         <td>{order.amount ? order.amount.toFixed(2) : '0.00'} DH</td>
                                         <td>
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                                className="status-select"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <option value="Packing">Packing</option>
-                                                <option value="Ramassage">Ramassage</option>
-                                                <option value="Livraison">Livraison</option>
-                                                <option value="Livré">Livré</option>
-                                                <option value="Pas de réponse client">Pas de réponse</option>
-                                                <option value="Retour">Retour</option>
-                                            </select>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
+                                                {order.status}
+                                            </span>
                                         </td>
                                         <td>
                                             <button
                                                 className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors"
-                                                onClick={() => generateInvoice(order)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    generateInvoice(order);
+                                                }}
                                                 title="Télécharger Facture"
                                             >
                                                 <FileText size={18} />

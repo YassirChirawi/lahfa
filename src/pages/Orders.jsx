@@ -18,11 +18,17 @@ import MessagePreviewModal from '../components/MessagePreviewModal';
 import TrackingTimelineModal from '../components/TrackingTimelineModal'; // Added
 
 import { mapSenditStatus, isReturnStatus } from '../utils/statusMapping';
+import { getStatusColor } from '../utils/statusStyles';
+
+import { useLocation } from 'react-router-dom';
 
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
     const { products, addPendingReturn, cancelPendingReturn } = useProducts();
     const { confirm, prompt } = useConfirmation();
+    const location = useLocation(); // Add hook
+
+    // ... existing state ...
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [cityFilter, setCityFilter] = useState('');
@@ -35,6 +41,7 @@ const Orders = () => {
     const [showTrash, setShowTrash] = useState(false); // Toggle for deleted orders
     const [whatsappLang, setWhatsappLang] = useState('fr'); // 'fr' or 'darija'
     const [selectedOrders, setSelectedOrders] = useState([]); // Multiple selection for ramassage
+    const [highlightId, setHighlightId] = useState(null); // Local highlight state
 
     // WhatsApp Modal State
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -47,6 +54,16 @@ const Orders = () => {
 
     // Active Providers State
     const [activeProviders, setActiveProviders] = useState({ olivraison: false, sendit: false });
+
+    // Handle Navigation Highlight
+    useEffect(() => {
+        if (location.state?.highlightId) {
+            setHighlightId(location.state.highlightId);
+            // Clear highlight after 3 seconds
+            const timer = setTimeout(() => setHighlightId(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [location.state]);
 
     useEffect(() => {
         const fetchProviders = async () => {
@@ -94,26 +111,7 @@ const Orders = () => {
         return matchesStatus && matchesSearch && matchesCity && matchesProduct && matchesDate && matchesMinPrice && matchesMaxPrice;
     });
 
-    const getStatusColor = (status) => {
-        const s = (status || '').toLowerCase();
 
-        if (s.includes('livré') && !s.includes('partie')) return 'status-success'; // Vert
-        if (s.includes('partie')) return 'status-warning'; // Jaune/Orange pour partiel
-
-        if (s.includes('retour') || s === 'annulé' || s === 'refusé' || s.includes('changer')) return 'status-danger'; // Rouge
-
-        if (s.includes('injoignable') || s.includes('reporté') || s.includes('programmé')) return 'status-warning'; // Orange
-
-        if (s.includes('cours de livraison') || s.includes('distribué')) return 'status-primary'; // Bleu vif
-
-        if (s.includes('entrepôt') || s.includes('transit') || s.includes('ramassé')) return 'status-info'; // Bleu clair
-
-        if (s.includes('attente') || s.includes('préparer') || s === 'packing') return 'status-default'; // Gris
-
-        if (s.includes('ramassage en cours')) return 'status-info';
-
-        return 'status-default';
-    };
 
     const handleOpenTracking = async (order) => {
         if (!order.deliveryValues?.trackingID) return;
@@ -894,7 +892,11 @@ const Orders = () => {
                                 }];
 
                                 return (
-                                    <tr key={order.id} style={{ verticalAlign: 'top' }} className={selectedOrders.includes(order.id) ? 'bg-indigo-50/30' : ''}>
+                                    <tr
+                                        key={order.id}
+                                        style={{ verticalAlign: 'top' }}
+                                        className={`transition-colors duration-500 ${highlightId === order.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''} ${selectedOrders.includes(order.id) ? 'bg-indigo-50/30' : ''}`}
+                                    >
                                         <td className="w-10">
                                             <input
                                                 type="checkbox"
