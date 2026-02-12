@@ -2,7 +2,7 @@ import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 const SETTINGS_DOC = 'settings/delivery';
-const API_BASE_URL = 'https://app.sendit.ma/api/v1';
+const API_BASE_URL = '/api/sendit';
 
 let cachedToken = null;
 let tokenExpiration = null;
@@ -51,11 +51,23 @@ const senditService = {
             });
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
+                let error = {};
+                try {
+                    const errorText = await response.text();
+                    if (errorText) error = JSON.parse(errorText);
+                } catch (e) { }
                 throw new Error(error.message || `Auth failed: ${response.status}`);
             }
 
-            const data = await response.json();
+            let data = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Auth response:", responseText);
+                }
+            }
             console.log("Sendit Auth Response:", data);
 
             if (!data.token && !data.access_token) {
@@ -103,7 +115,17 @@ const senditService = {
                 });
 
                 if (!response.ok) break;
-                const result = await response.json();
+
+                let result = {};
+                const responseText = await response.text();
+                if (responseText) {
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error("Failed to parse districts response:", responseText);
+                        break;
+                    }
+                }
 
                 // Handle different API response structures
                 const districts = Array.isArray(result) ? result : (result.data || result.districts || []);
@@ -225,13 +247,22 @@ const senditService = {
                 body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Create Package response:", responseText);
+                }
+            }
 
             if (!response.ok) {
                 console.error("Sendit Create Error:", result);
-                let errorMessage = result.message || "Erreur lors de la création du colis Sendit";
-                if (result.errors) {
-                    const details = Object.entries(result.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+                let errorMessage = result.message || `Erreur API (${response.status})`;
+                const errors = result.errors || result.data?.errors;
+                if (errors) {
+                    const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
                     errorMessage = `${errorMessage} \n Détails: ${details}`;
                 }
                 throw new Error(errorMessage);
@@ -267,10 +298,18 @@ const senditService = {
             });
 
             if (!response.ok) {
-                throw new Error("Impossible de récupérer le statut Sendit");
+                throw new Error(`Impossible de récupérer le statut Sendit (${response.status})`);
             }
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Status response:", responseText);
+                }
+            }
 
             // Expected: { code: "...", status: "...", ... }
             return {
@@ -300,7 +339,8 @@ const senditService = {
 
             if (!response.ok) {
                 if (response.status === 404) return true;
-                throw new Error("Impossible d'annuler le colis Sendit");
+                const errorText = await response.text().catch(() => "");
+                throw new Error(`Impossible d'annuler le colis Sendit (${response.status}) ${errorText.substring(0, 50)}`);
             }
             return true;
         } catch (error) {
@@ -341,11 +381,21 @@ const senditService = {
                 body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Sendit response as JSON:", responseText);
+                    if (!response.ok) throw new Error(`Erreur serveur (${response.status}): ${responseText.substring(0, 100)}`);
+                }
+            }
 
             if (!response.ok) {
                 console.error("Sendit Pickup Error:", result);
-                let errorMessage = result.message || result.error || "Erreur lors de la demande de ramassage";
+                let errorMessage = result.message || result.error || `Erreur API (${response.status})`;
                 const errors = result.errors || result.data?.errors;
                 if (errors) {
                     const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
@@ -393,11 +443,21 @@ const senditService = {
                 body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Sendit response as JSON:", responseText);
+                    if (!response.ok) throw new Error(`Erreur serveur (${response.status}): ${responseText.substring(0, 100)}`);
+                }
+            }
 
             if (!response.ok) {
                 console.error("Sendit Return Error:", result);
-                let errorMessage = result.message || result.error || "Erreur lors de la demande de retour";
+                let errorMessage = result.message || result.error || `Erreur API (${response.status})`;
                 const errors = result.errors || result.data?.errors;
                 if (errors) {
                     const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
@@ -431,10 +491,18 @@ const senditService = {
                 body: JSON.stringify({ deliveries, printFormat })
             });
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Labels response:", responseText);
+                }
+            }
 
             if (!response.ok) {
-                throw new Error(result.message || "Erreur lors de la génération des étiquettes");
+                throw new Error(result.message || `Erreur lors de la récupération des étiquettes (${response.status})`);
             }
 
             return result; // Should contain the PDF URL
@@ -463,10 +531,19 @@ const senditService = {
                     }
                 });
 
-                const result = await response.json();
+                let result = {};
+                const responseText = await response.text();
+                if (responseText) {
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error("Failed to parse Sync response:", responseText);
+                        if (!response.ok) throw new Error(`Erreur serveur (${response.status})`);
+                    }
+                }
 
                 if (!response.ok) {
-                    throw new Error(result.message || "Erreur lors de la récupération des colis Sendit");
+                    throw new Error(result.message || `Erreur lors de la récupération des colis Sendit (${response.status})`);
                 }
 
                 const pageDeliveries = result.data || [];
@@ -512,10 +589,18 @@ const senditService = {
                 }
             });
 
-            const result = await response.json();
+            let result = {};
+            const responseText = await response.text();
+            if (responseText) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Failed to parse Invoices response:", responseText);
+                }
+            }
 
             if (!response.ok) {
-                throw new Error(result.message || "Erreur lors de la récupération des factures");
+                throw new Error(result.message || `Erreur lors de la récupération des factures (${response.status})`);
             }
 
             return result;

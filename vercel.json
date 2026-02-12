@@ -5,6 +5,10 @@
             "destination": "https://partners.olivraison.com/:match*"
         },
         {
+            "source": "/api/sendit/:match*",
+            "destination": "https://app.sendit.ma/api/v1/:match*"
+        },
+        {
             "source": "/api/sendit-webhook",
             "destination": "/api/sendit-webhook"
         },

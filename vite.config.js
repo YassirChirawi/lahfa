@@ -35,6 +35,11 @@ export default defineConfig({
         target: 'https://partners.olivraison.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/olivraison/, '')
+      },
+      '/api/sendit': {
+        target: 'https://app.sendit.ma/api/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sendit/, '')
       }
     }
   }
