@@ -30,11 +30,10 @@ export default defineConfig({
       }
     }),
     legacy({
-      targets: ['defaults', 'not IE 11', 'ios >= 11'],
+      targets: ['ios >= 11', 'chrome >= 60', 'safari >= 11', 'defaults'],
     }),
   ],
   build: {
-    target: 'es2015',
     minify: 'terser',
   },
   server: {

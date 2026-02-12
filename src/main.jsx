@@ -63,6 +63,8 @@ class ErrorBoundary extends Component {
   }
 }
 
+console.log("🚀 Lahfa Dash Initializing...");
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>

@@ -12,10 +12,20 @@ export const SecurityProvider = ({ children }) => {
 
     // Check for biometric availability on mount
     useEffect(() => {
-        if (window.PublicKeyCredential) {
-            PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-                .then(available => setHasBiometrics(available))
-                .catch(err => console.error("Bio Check Error:", err));
+        try {
+            if (window.PublicKeyCredential && typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+                    .then(available => setHasBiometrics(!!available))
+                    .catch(err => {
+                        console.warn("Bio Check Suppressed:", err);
+                        setHasBiometrics(false);
+                    });
+            } else {
+                setHasBiometrics(false);
+            }
+        } catch (e) {
+            console.warn("Security Context Init Error (Suppressed):", e);
+            setHasBiometrics(false);
         }
     }, []);
 
