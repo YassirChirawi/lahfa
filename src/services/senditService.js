@@ -365,8 +365,8 @@ const senditService = {
                 address: pickupData.address || "",
                 note: pickupData.note || "Demande de ramassage depuis le dashboard",
                 deliveries: Array.isArray(pickupData.deliveries)
-                    ? pickupData.deliveries
-                    : (pickupData.deliveries ? pickupData.deliveries.toString().split(',') : [])
+                    ? pickupData.deliveries.join(',')
+                    : (pickupData.deliveries || "")
             };
 
             console.log("Requesting Sendit Pickup:", payload);
@@ -401,6 +401,12 @@ const senditService = {
                     const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
                     errorMessage = `${errorMessage} (Détails: ${details})`;
                 }
+
+                // Add body context for 500 errors
+                if (response.status >= 500 && responseText) {
+                    errorMessage += ` | Response: ${responseText.substring(0, 150)}`;
+                }
+
                 throw new Error(errorMessage);
             }
 
@@ -427,8 +433,8 @@ const senditService = {
                 address: returnData.address || "",
                 note: returnData.note || "Demande de retour depuis le dashboard",
                 deliveries: Array.isArray(returnData.deliveries)
-                    ? returnData.deliveries
-                    : (returnData.deliveries ? returnData.deliveries.toString().split(',') : [])
+                    ? returnData.deliveries.join(',')
+                    : (returnData.deliveries || "")
             };
 
             console.log("Requesting Sendit Return:", payload);
@@ -463,6 +469,11 @@ const senditService = {
                     const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
                     errorMessage = `${errorMessage} (Détails: ${details})`;
                 }
+
+                if (response.status >= 500 && responseText) {
+                    errorMessage += ` | Response: ${responseText.substring(0, 150)}`;
+                }
+
                 throw new Error(errorMessage);
             }
 
