@@ -90,7 +90,7 @@ const CityAutocomplete = ({ value, onChange }) => {
     );
 };
 
-const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
+const CreateOrderModal = ({ isOpen, onClose, onSave, onDelete, initialData = null }) => {
     // Default initial state
     const defaultState = {
         customer: '',
@@ -636,6 +636,17 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, initialData = null }) => {
                     </select>
 
                     <div className="flex gap-3">
+                        {onDelete && initialData && (
+                            <button
+                                type="button"
+                                onClick={() => onDelete(initialData)}
+                                className="mr-auto px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <Trash2 size={18} />
+                                <span className="hidden sm:inline">Supprimer</span>
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={onClose}

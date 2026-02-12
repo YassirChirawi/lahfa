@@ -576,6 +576,32 @@ const Orders = () => {
     };
 
 
+    const handleDeleteOrder = async (order) => {
+        if (!order) return;
+        if (order.deliveryValues?.trackingID) {
+            if (window.confirm(`Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`)) {
+                const toastId = toast.loading("Annulation...");
+                try {
+                    if (order.deliveryValues.provider === 'sendit') {
+                        await senditService.cancelPackage(order.deliveryValues.trackingID);
+                    } else {
+                        await olivraisonService.cancelPackage(order.deliveryValues.trackingID);
+                    }
+                    toast.success("Annulé !", { id: toastId });
+                } catch (e) {
+                    toast.error("Erreur annulation: " + e.message, { id: toastId });
+                    if (!window.confirm("Forcer la suppression locale ?")) return;
+                }
+            }
+        }
+
+        if (window.confirm("Êtes-vous sûr de vouloir supprimer cette commande ?")) {
+            await deleteOrder(order.id);
+            setIsModalOpen(false);
+            setEditingOrder(null);
+        }
+    };
+
     const handleManualLink = async (order) => {
         const trackingId = window.prompt("Entrez le Code de Suivi Sendit (ex: DH... ou SNDT...) :");
         if (!trackingId) return;
@@ -940,30 +966,7 @@ const Orders = () => {
                                                             </>
                                                         )}
 
-                                                        <button
-                                                            className="icon-btn-sm text-red-500 hover:bg-red-50 ml-8"
-                                                            onClick={async () => {
-                                                                if (order.deliveryValues?.trackingID) {
-                                                                    if (window.confirm(`Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`)) {
-                                                                        const toastId = toast.loading("Annulation...");
-                                                                        try {
-                                                                            if (order.deliveryValues.provider === 'sendit') {
-                                                                                await senditService.cancelPackage(order.deliveryValues.trackingID);
-                                                                            } else {
-                                                                                await olivraisonService.cancelPackage(order.deliveryValues.trackingID);
-                                                                            }
-                                                                            toast.success("Annulé !", { id: toastId });
-                                                                        } catch (e) {
-                                                                            toast.error("Erreur annulation: " + e.message, { id: toastId });
-                                                                            if (!window.confirm("Forcer la suppression locale ?")) return;
-                                                                        }
-                                                                    }
-                                                                }
-                                                                deleteOrder(order.id);
-                                                            }}
-                                                            title="Supprimer">
-                                                            <Trash2 size={16} />
-                                                        </button>
+
 
                                                         {/* WhatsApp Button */}
                                                         {order.phone && (
@@ -1003,6 +1006,7 @@ const Orders = () => {
             <CreateOrderModal
                 isOpen={isModalOpen}
                 onClose={() => { setIsModalOpen(false); setEditingOrder(null); }}
+                onDelete={handleDeleteOrder}
                 onSave={handleSaveOrder}
                 initialData={editingOrder}
             />
