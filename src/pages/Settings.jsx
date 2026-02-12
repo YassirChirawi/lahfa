@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Save, Lock, Truck, AlertCircle, CheckCircle } from 'lucide-react';
 import Button from '../components/Button';
-import { Tag, Calendar, Percent, ShoppingBag, Bell } from 'lucide-react';
+import { Tag, Calendar, Percent, ShoppingBag, Bell, Box } from 'lucide-react';
 import usePushNotifications from '../hooks/usePushNotifications';
 import { useProducts } from '../context/ProductContext';
 import { useConfirmation } from '../context/ConfirmationContext';
