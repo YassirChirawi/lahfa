@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2, MapPin } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2, Link2Off, MapPin } from 'lucide-react';
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
@@ -666,6 +666,27 @@ const Orders = () => {
         }
     };
 
+    const handleUnlinkDelivery = async (order) => {
+        if (!await confirm({
+            title: 'Dissocier la commande',
+            message: `Voulez-vous vraiment retirer le code de suivi #${order.deliveryValues?.trackingID} de cette commande ?`,
+            confirmText: 'Dissocier',
+            variant: 'danger'
+        })) return;
+
+        const toastId = toast.loading("Dissociation en cours...");
+        try {
+            const orderRef = doc(db, 'orders', order.id);
+            await updateDoc(orderRef, {
+                deliveryValues: null
+            });
+            toast.success("Commande dissociée avec succès !", { id: toastId });
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la dissociation : " + e.message, { id: toastId });
+        }
+    };
+
     return (
         <div className="orders-page">
             <MessagePreviewModal
@@ -1050,6 +1071,13 @@ const Orders = () => {
                                                                     title="Voir l'historique détaillé"
                                                                 >
                                                                     <MapPin size={16} />
+                                                                </button>
+                                                                <button
+                                                                    className="icon-btn-sm text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                                    onClick={() => handleUnlinkDelivery(order)}
+                                                                    title="Dissocier / Retirer le tracking"
+                                                                >
+                                                                    <Link2Off size={16} />
                                                                 </button>
                                                             </>
                                                         )}
