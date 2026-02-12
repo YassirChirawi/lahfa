@@ -39,7 +39,17 @@ const useOrderPolling = (options = {}) => {
         for (const order of activeOrders) {
             try {
                 const trackingID = order.deliveryValues.trackingID;
-                const provider = order.deliveryValues.provider || 'olivraison';
+                let provider = order.deliveryValues.provider;
+
+                // Robust heuristic if provider is missing
+                if (!provider) {
+                    const tid = (trackingID || '').toString().trim().toUpperCase();
+                    if (tid.startsWith('DH') || tid.startsWith('SNDT')) {
+                        provider = 'sendit';
+                    } else {
+                        provider = 'olivraison';
+                    }
+                }
 
                 let result;
                 if (provider === 'sendit') {
@@ -57,6 +67,7 @@ const useOrderPolling = (options = {}) => {
                     const updates = {
                         deliveryValues: {
                             ...order.deliveryValues,
+                            provider: provider, // PERSIST detected provider
                             status: newDeliveryStatus,
                             lastChecked: new Date().toISOString()
                         }

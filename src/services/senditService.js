@@ -323,8 +323,10 @@ const senditService = {
                 name: pickupData.name || "Vendeur",
                 phone: pickupData.phone || "",
                 address: pickupData.address || "",
-                comment: pickupData.note || "Demande de ramassage depuis le dashboard",
-                deliveries: pickupData.deliveries // DX1,DX2,DX3
+                note: pickupData.note || "Demande de ramassage depuis le dashboard",
+                deliveries: Array.isArray(pickupData.deliveries)
+                    ? pickupData.deliveries
+                    : (pickupData.deliveries ? pickupData.deliveries.toString().split(',') : [])
             };
 
             console.log("Requesting Sendit Pickup:", payload);
@@ -343,7 +345,13 @@ const senditService = {
 
             if (!response.ok) {
                 console.error("Sendit Pickup Error:", result);
-                throw new Error(result.message || "Erreur lors de la demande de ramassage");
+                let errorMessage = result.message || result.error || "Erreur lors de la demande de ramassage";
+                const errors = result.errors || result.data?.errors;
+                if (errors) {
+                    const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+                    errorMessage = `${errorMessage} (Détails: ${details})`;
+                }
+                throw new Error(errorMessage);
             }
 
             return result;
@@ -367,8 +375,10 @@ const senditService = {
                 name: returnData.name || "Vendeur",
                 phone: returnData.phone || "",
                 address: returnData.address || "",
-                comment: returnData.note || "Demande de retour depuis le dashboard",
-                deliveries: returnData.deliveries // DX1,DX2,DX3
+                note: returnData.note || "Demande de retour depuis le dashboard",
+                deliveries: Array.isArray(returnData.deliveries)
+                    ? returnData.deliveries
+                    : (returnData.deliveries ? returnData.deliveries.toString().split(',') : [])
             };
 
             console.log("Requesting Sendit Return:", payload);
@@ -387,7 +397,13 @@ const senditService = {
 
             if (!response.ok) {
                 console.error("Sendit Return Error:", result);
-                throw new Error(result.message || "Erreur lors de la demande de retour");
+                let errorMessage = result.message || result.error || "Erreur lors de la demande de retour";
+                const errors = result.errors || result.data?.errors;
+                if (errors) {
+                    const details = Object.entries(errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+                    errorMessage = `${errorMessage} (Détails: ${details})`;
+                }
+                throw new Error(errorMessage);
             }
 
             return result;

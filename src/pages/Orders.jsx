@@ -307,7 +307,21 @@ const Orders = () => {
 
     const handleSyncStatus = async (order) => {
         if (!order.deliveryValues?.trackingID) return;
-        const provider = order.deliveryValues.provider || 'olivraison';
+
+        // Robust provider detection: check field or deduce from tracking ID format
+        let provider = order.deliveryValues.provider;
+        if (!provider) {
+            const tid = order.deliveryValues.trackingID || '';
+            if (tid.startsWith('DH') || tid.startsWith('SNDT')) {
+                provider = 'sendit';
+            } else if (activeProviders.sendit && !activeProviders.olivraison) {
+                provider = 'sendit';
+            } else if (activeProviders.olivraison && !activeProviders.sendit) {
+                provider = 'olivraison';
+            } else {
+                provider = 'olivraison'; // Default fallback
+            }
+        }
 
         const toastId = toast.loading(`Sync ${provider}...`);
         try {
@@ -331,6 +345,7 @@ const Orders = () => {
             await updateOrder(order.id, {
                 deliveryValues: {
                     ...order.deliveryValues,
+                    provider: provider, // PERSIST detected provider
                     status: deliveryStatus,
                     lastSync: new Date().toISOString()
                 },
@@ -345,7 +360,11 @@ const Orders = () => {
         if (selectedOrders.length === 0) return;
 
         const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
-        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+        const senditOrders = selectedDocs.filter(o => {
+            const dv = o.deliveryValues;
+            if (!dv?.trackingID) return false;
+            return dv.provider === 'sendit' || dv.trackingID.startsWith('DH') || dv.trackingID.startsWith('SNDT');
+        });
 
         if (senditOrders.length === 0) {
             toast.error("Aucune commande Sendit valide sélectionnée.");
@@ -407,7 +426,11 @@ const Orders = () => {
         if (selectedOrders.length === 0) return;
 
         const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
-        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+        const senditOrders = selectedDocs.filter(o => {
+            const dv = o.deliveryValues;
+            if (!dv?.trackingID) return false;
+            return dv.provider === 'sendit' || dv.trackingID.startsWith('DH') || dv.trackingID.startsWith('SNDT');
+        });
 
         if (senditOrders.length === 0) {
             toast.error("Aucune commande Sendit valide sélectionnée.");
@@ -470,7 +493,11 @@ const Orders = () => {
         if (selectedOrders.length === 0) return;
 
         const selectedDocs = orders.filter(o => selectedOrders.includes(o.id));
-        const senditOrders = selectedDocs.filter(o => o.deliveryValues?.provider === 'sendit' && o.deliveryValues?.trackingID);
+        const senditOrders = selectedDocs.filter(o => {
+            const dv = o.deliveryValues;
+            if (!dv?.trackingID) return false;
+            return dv.provider === 'sendit' || dv.trackingID.startsWith('DH') || dv.trackingID.startsWith('SNDT');
+        });
 
         if (senditOrders.length === 0) {
             toast.error("Aucune commande Sendit valide sélectionnée.");
@@ -511,13 +538,12 @@ const Orders = () => {
             for (const item of deliveries) {
                 const trackingID = item.code || item.trackingID;
                 const deliveryStatus = item.status;
-                const reference = item.reference; // Reference sent to Sendit (usually order.displayId or order.id)
+                const reference = item.reference;
 
-                // 1. Find local order by Tracking ID (Priority)
+                // 1. Find local order by Tracking ID
                 let localOrder = orders.find(o => o.deliveryValues?.trackingID === trackingID);
 
                 // 2. If not found, Try Smart Link by Reference
-                // Only if the local order is NOT already linked to another tracking ID
                 if (!localOrder && reference) {
                     localOrder = orders.find(o =>
                         (o.displayId === reference || o.id === reference) &&
@@ -526,42 +552,37 @@ const Orders = () => {
 
                     if (localOrder) {
                         console.log(`🔗 Auto-Link: Commande ${localOrder.displayId || localOrder.id} liée au Tracking ${trackingID}`);
-
-                        // Link immediately
-                        await updateOrder(localOrder.id, {
-                            deliveryValues: {
-                                provider: 'sendit',
-                                trackingID: trackingID,
-                                status: deliveryStatus,
-                                lastSync: new Date().toISOString(),
-                                autoLinked: true
-                            }
-                        });
                         linkedCount++;
-                        // Update local object to allow status update in next block
-                        localOrder = { ...localOrder, deliveryValues: { ...localOrder.deliveryValues, trackingID, status: deliveryStatus } };
                     }
                 }
 
-                // 3. Update Status if matched (either previously or just now)
+                // 3. Update Status and/or Link
                 if (localOrder) {
                     const mappedStatus = mapSenditStatus(deliveryStatus);
-                    let shouldUpdateMainStatus = mappedStatus && mappedStatus !== localOrder.status;
-                    let shouldUpdateDeliveryStatus = deliveryStatus !== localOrder.deliveryValues?.status;
+                    const shouldUpdateMainStatus = mappedStatus && mappedStatus !== localOrder.status;
+                    const isNewLink = !localOrder.deliveryValues?.trackingID;
+                    const isNewStatus = deliveryStatus !== localOrder.deliveryValues?.status;
 
-                    if (shouldUpdateMainStatus) {
-                        await applyStatusUpdate(localOrder.id, mappedStatus);
-                    }
-
-                    if (shouldUpdateMainStatus || shouldUpdateDeliveryStatus) {
-                        // Avoid double update if we just linked it, but ensure status is fresh
-                        await updateOrder(localOrder.id, {
+                    if (shouldUpdateMainStatus || isNewLink || isNewStatus) {
+                        // Prepare unified update
+                        const updates = {
                             deliveryValues: {
                                 ...localOrder.deliveryValues,
+                                provider: 'sendit', // FORCE Sendit for this sync's results
+                                trackingID: trackingID,
                                 status: deliveryStatus,
                                 lastSync: new Date().toISOString()
                             }
-                        });
+                        };
+
+                        if (isNewLink) updates.deliveryValues.autoLinked = true;
+
+                        await updateOrder(localOrder.id, updates);
+
+                        if (shouldUpdateMainStatus) {
+                            await applyStatusUpdate(localOrder.id, mappedStatus);
+                        }
+
                         updatedCount++;
                     }
                 }
@@ -1017,9 +1038,9 @@ const Orders = () => {
                                                         ) : (
                                                             <>
                                                                 <button
-                                                                    className={`icon-btn-sm hover:bg-green-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : 'text-green-600'}`}
+                                                                    className={`icon-btn-sm hover:bg-indigo-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : (order.deliveryValues.provider === 'olivraison' ? 'text-green-600' : 'text-indigo-400')}`}
                                                                     onClick={() => handleSyncStatus(order)}
-                                                                    title={`Sync avec ${order.deliveryValues.provider}`}
+                                                                    title={`Sync avec ${order.deliveryValues.provider || (order.deliveryValues.trackingID?.startsWith('DH') ? 'sendit' : 'transporteur')}`}
                                                                 >
                                                                     <RefreshCw size={16} />
                                                                 </button>
