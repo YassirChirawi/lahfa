@@ -1,44 +1,37 @@
 import { useEffect, useRef } from 'react';
 import { useOrders } from '../context/OrderContext';
+import { useProducts } from '../context/ProductContext';
 import { getPackageStatus } from '../services/olivraisonService';
+import { mapSenditStatus, isReturnStatus } from '../utils/statusMapping';
 import toast from 'react-hot-toast';
 
-const POLL_INTERVAL = 30 * 1000; // 30 seconds for near-instant updates
-
-// ... (imports remain the same)
+const POLL_INTERVAL = 30 * 1000;
 
 const useOrderPolling = (options = {}) => {
     const { orders, updateOrder } = useOrders();
-    const ordersRef = useRef(orders);
+    const { products, addPendingReturn, cancelPendingReturn } = useProducts();
 
-    // Keep ref in sync
+    const ordersRef = useRef(orders);
+    const productsRef = useRef(products);
+
+    // Keep refs in sync
     useEffect(() => {
         ordersRef.current = orders;
     }, [orders]);
 
+    useEffect(() => {
+        productsRef.current = products;
+    }, [products]);
+
     const checkStatuses = async () => {
         const activeOrders = ordersRef.current.filter(order =>
             order.deliveryValues?.trackingID &&
-            ['Ramassage', 'Packing', 'Livraison'].includes(order.status) && // Expanded status check slightly? Or keep strict? 
-            // Original only checked 'Ramassage'. User wants updates. 'Livraison' also makes sense to check. 
-            // Let's stick to original logic unless asked, but maybe expand to 'Livraison' if provider supports it.
-            // Actually, let's keep it safe and stick to what it was or slightly expand if safe. 
-            // Original: order.status === 'Ramassage'
-            // Let's allow 'Ramassage' and 'Livraison' as these are active shipping states.
-            // Actually, let's just stick to the original logic for now to avoid regressions, 
-            // BUT allow the manual trigger to check more if needed.
-            // For now, I'll keep the logic mostly same but exported.
-
-            // WAIT - original code: order.status === 'Ramassage'. 
-            // If I change this, I might break flow. I will keep it as is for now, but ensure the function is robust.
-            order.status === 'Ramassage' &&
-            !order.deleted
+            !order.deleted &&
+            // Exclude only final statuses to ensure we catch all intermediate granular updates
+            !['Livré', 'Livré Partiellement', 'Retour', 'Annulé', 'Refusé', 'À changer'].includes(order.status)
         );
 
-        if (activeOrders.length === 0) {
-            console.log("No active orders to poll.");
-            return 0;
-        }
+        if (activeOrders.length === 0) return 0;
 
         console.log(`Polling status for ${activeOrders.length} orders...`);
         let updatesCount = 0;
@@ -56,31 +49,90 @@ const useOrderPolling = (options = {}) => {
                     result = await getPackageStatus(trackingID);
                 }
 
-                const oldStatus = order.deliveryValues.status; // This is the delivery status, not order status
-                const newStatus = result.status;
+                const newDeliveryStatus = result.status;
+                const oldDeliveryStatus = order.deliveryValues.status;
 
-                if (newStatus && newStatus !== oldStatus) {
-                    console.log(`Order ${order.id} (${provider}) status changed: ${oldStatus} -> ${newStatus}`);
-
-                    await updateOrder(order.id, {
+                // 1. Check for status change
+                if (newDeliveryStatus && newDeliveryStatus !== oldDeliveryStatus) {
+                    const updates = {
                         deliveryValues: {
                             ...order.deliveryValues,
-                            status: newStatus,
+                            status: newDeliveryStatus,
                             lastChecked: new Date().toISOString()
                         }
-                    });
+                    };
+
+                    // 2. Map to Main Status if Sendit
+                    if (provider === 'sendit') {
+                        const mappedStatus = mapSenditStatus(newDeliveryStatus);
+                        if (mappedStatus && mappedStatus !== order.status) {
+                            updates.status = mappedStatus;
+
+                            // 3. Handle Stock Logic for Returns
+                            const previousStatus = order.status;
+                            const newStatus = mappedStatus;
+                            const currentProducts = productsRef.current;
+
+                            // If moving TO a return status
+                            if (isReturnStatus(newStatus) && !isReturnStatus(previousStatus)) {
+                                const itemsToReturn = order.items || [{
+                                    article: order.article,
+                                    quantity: order.quantity || 1
+                                }];
+
+                                let returnedCount = 0;
+                                for (const item of itemsToReturn) {
+                                    // Logic matching Orders.jsx
+                                    let product = currentProducts.find(p => p.id === item.productId);
+                                    if (!product) product = currentProducts.find(p => p.name === (item.article || item.name));
+
+                                    if (product) {
+                                        await addPendingReturn(product.id, item.quantity || 1);
+                                        returnedCount += (item.quantity || 1);
+                                    }
+                                }
+                                if (returnedCount > 0) {
+                                    if (returnedCount > 0) {
+                                        toast(`${returnedCount} produits mis en "Retour" (Auto)`, {
+                                            icon: '↩️',
+                                            duration: 4000
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    await updateOrder(order.id, updates);
                     updatesCount++;
 
-                    if (Notification.permission === 'granted') {
-                        new Notification(`Mise à jour Commande #${order.displayId || order.id}`, {
-                            body: `Nouveau statut (${provider}): ${newStatus}`,
-                            icon: '/pwa-192x192.png'
-                        });
-                    } else {
-                        toast.success(`Commande #${order.displayId || order.id}: ${newStatus}`, {
-                            icon: '🚚'
-                        });
-                    }
+                    // Notifications
+                    const notify = async () => {
+                        if (Notification.permission === 'granted') {
+                            const title = `Mise à jour Commande #${order.displayId || order.id}`;
+                            const options = {
+                                body: `Nouveau statut: ${newDeliveryStatus}`,
+                                icon: '/pwa-192x192.png',
+                                vibrate: [200, 100, 200]
+                            };
+
+                            try {
+                                const registration = await navigator.serviceWorker.getRegistration();
+                                if (registration) {
+                                    registration.showNotification(title, options);
+                                } else {
+                                    new Notification(title, options);
+                                }
+                            } catch (e) {
+                                new Notification(title, options);
+                            }
+                        } else {
+                            toast.success(`Commande #${order.displayId || order.id}: ${newDeliveryStatus}`, {
+                                icon: '🚚'
+                            });
+                        }
+                    };
+                    notify();
                 }
             } catch (error) {
                 console.error(`Failed to check status for order ${order.id}`, error);

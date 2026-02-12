@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { useClients } from '../context/ClientContext';
 import { useProducts } from '../context/ProductContext';
-import { Search, ChevronDown, Check, Plus, Trash2, Tag, Gift } from 'lucide-react';
+import { Search, ChevronDown, Check, Plus, Trash2, Tag, Gift, MapPin } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 

@@ -2,7 +2,7 @@
 export const DEFAULT_TEMPLATES = {
     'packing': "Bonjour [Client] 💖\nMerci pour votre commande chez [Store] !\n\nVoici les détails\n\nNuméro joignable :\n[Phone]\n\nAdresse de livraison :\n[Adresse] [Ville]\n\nTotal (articles + livraison) :\n[Total] DH\n\n💳 Paiement à la livraison.\n\nMerci pour votre confiance et bienvenue dans l’univers LAHFA ✨\n\nSi vous confirmez les infos de la commande réagissez avec un pouce 👍",
     'ramassage': "Bonjour [Client], votre commande est prête et sera bientôt remise au livreur.",
-    'livraison': "Bonjour [Client] 🤍\nVotre commande est déjà arrivée dans votre ville. Voici le numéro du livreur :\n[DeliveryManPhone]\n\nN’hésitez pas à l’appeler si vous souhaitez lui préciser l’heure qui vous arrange pour la livraison. Merci 🌸",
+    'livraison': "Bonjour [Client] 🤍\nVotre commande est arrivée dans votre ville. Attendez l'appel du livreur très prochainement pour la livraison 🚚.\nMerci de rester joignable ! 🌸",
     'livré': "Bonjour [Client] ✨\nMerci infiniment 🌸\nNous espérons que votre commande vous apporte entière satisfaction 🤍\nCe message confirme la bonne réception de votre article Lahfa’h 💌",
     'pas de réponse client': "Bonjour [Client] 🌸, nous avons tenté de vous joindre concernant votre commande LAHFA mais sans succès. Quand seriez-vous disponible ? Merci ✨",
     'retour': "Bonjour [Client], votre commande nous a été retournée.",
@@ -28,14 +28,31 @@ export const DARIJA_TEMPLATES = {
  * @param {object} overrides - Optional overrides for dynamic fields { clientName, phone, city, address, product, total }
  */
 export const getWhatsappMessage = (status, order, lang = 'fr', overrides = {}) => {
-    // Map local status to template keys if needed
-    // Local statuses: 'Packing', 'Ramassage', 'Livraison', 'Livré', 'Pas de réponse client', 'Retour'
-    // Template keys need to match.
-    // Normalized key: lowercase
-    const key = status ? status.toLowerCase() : 'packing';
+    // Map granular statuses to template keys
+    let key = 'packing';
+    const s = (status || '').toLowerCase();
 
-    // Fallback mapping if keys don't perfectly match (e.g. 'ramassage' vs 'Ramassage' handled by toLowerCase)
-    // 'Pas de réponse client' -> 'pas de réponse client'
+    if (s.includes('packing') || s.includes('attente') || s.includes('préparer') || s.includes('created')) {
+        key = 'packing';
+    }
+    else if (s.includes('ramass') || s.includes('entrepôt') || s.includes('transit')) {
+        key = 'ramassage';
+    }
+    else if (s.includes('cours de livraison') || s.includes('distribué') || s.includes('programmé') || s === 'livraison') {
+        key = 'livraison';
+    }
+    else if (s.includes('livré')) { // Covers 'Livré' and 'Livré Partiellement'
+        key = 'livré';
+    }
+    else if (s.includes('injoignable') || s.includes('reporté') || s.includes('réponse')) {
+        key = 'pas de réponse client';
+    }
+    else if (s.includes('retour') || s.includes('refusé') || s.includes('changer')) {
+        key = 'retour';
+    }
+    else if (s.includes('annulé')) {
+        key = 'annulé';
+    }
 
     const defaults = lang === 'darija' ? DARIJA_TEMPLATES : DEFAULT_TEMPLATES;
     const rawTemplate = defaults[key] || defaults['packing'] || "";

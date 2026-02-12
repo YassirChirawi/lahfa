@@ -4,9 +4,11 @@ import { Plus, Search, Edit2, Trash2, Package, Upload, Loader2, Share2, RotateCc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
 import { toast } from 'react-hot-toast';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 const Products = () => {
     const { products, addProduct, updateProduct, deleteProduct, resolvePendingReturn, loading } = useProducts();
+    const { confirm } = useConfirmation();
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('name');
     const [sortOrder, setSortOrder] = useState('asc');
@@ -115,7 +117,12 @@ const Products = () => {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Delete this product?')) {
+        if (await confirm({
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product?',
+            confirmText: 'Delete',
+            variant: 'danger'
+        })) {
             await deleteProduct(id);
         }
     };
@@ -136,7 +143,12 @@ const Products = () => {
 
     const handleResolveReturn = async (product) => {
         if (!product.pendingStock || product.pendingStock <= 0) return;
-        if (window.confirm(`Confirmer la réception de ${product.pendingStock} retours pour "${product.name}" ?\nCela va les ajouter au stock.`)) {
+        if (await confirm({
+            title: 'Réception retours',
+            message: `Confirmer la réception de ${product.pendingStock} retours pour "${product.name}" ?\nCela va les ajouter au stock.`,
+            confirmText: 'Confirmer',
+            variant: 'info'
+        })) {
             await resolvePendingReturn(product.id, product.pendingStock);
             toast.success("Stock mis à jour !");
         }

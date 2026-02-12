@@ -12,47 +12,17 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import '../styles/orders.css';
 import '../styles/modal.css';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 import MessagePreviewModal from '../components/MessagePreviewModal';
 import TrackingTimelineModal from '../components/TrackingTimelineModal'; // Added
 
-const mapSenditStatus = (senditStatus) => {
-    if (!senditStatus) return null;
-    const normalized = senditStatus.toUpperCase();
-
-    const statusMap = {
-        'DELIVERED': 'Livré',
-        'LIVRÉ': 'Livré',
-        'CANCELED': 'Retour',
-        'ANNULÉ': 'Retour',
-        'REJECTED': 'Retour',
-        'REFUSÉ': 'Retour',
-        'DELIVERING': 'Livraison',
-        'EN COURS DE LIVRAISON': 'Livraison',
-        'DISTRIBUTED': 'Livraison',
-        'DISTRIBUÉ': 'Livraison',
-        'UNREACHABLE': 'Pas de réponse client',
-        'INJOIGNABLE': 'Pas de réponse client',
-        'POSTPONED': 'Pas de réponse client',
-        'REPORTÉ': 'Pas de réponse client',
-        'PICKED_UP': 'Ramassage',
-        'PICKEDUP': 'Ramassage', // Added
-        'TO_PICKUP': 'Ramassage', // Added
-        'RAMASSÉ': 'Ramassage',
-        'WAREHOUSE': 'Ramassage',
-        'ENTREPÔT': 'Ramassage',
-        'TRANSIT': 'Ramassage',
-        'EN TRANSIT': 'Ramassage',
-        'CREATED': 'Ramassage',
-        'PENDING': 'Ramassage', // Added
-        'TO_PREPARE': 'Ramassage' // Added
-    };
-    return statusMap[normalized] || null;
-};
+import { mapSenditStatus, isReturnStatus } from '../utils/statusMapping';
 
 const Orders = () => {
     const { orders, addOrder, updateOrderStatus, updateOrder, deleteOrder, restoreOrder, permanentDeleteOrder } = useOrders();
     const { products, addPendingReturn, cancelPendingReturn } = useProducts();
+    const { confirm, prompt } = useConfirmation();
     const [filter, setFilter] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [cityFilter, setCityFilter] = useState('');
@@ -125,15 +95,24 @@ const Orders = () => {
     });
 
     const getStatusColor = (status) => {
-        switch (status) {
-            case 'Livré': return 'status-success';
-            case 'Packing': return 'status-warning';
-            case 'Ramassage': return 'status-info';
-            case 'Livraison': return 'status-primary'; // You might need to add this class or use another
-            case 'Retour': return 'status-danger';
-            case 'Pas de réponse client': return 'status-default';
-            default: return 'status-default';
-        }
+        const s = (status || '').toLowerCase();
+
+        if (s.includes('livré') && !s.includes('partie')) return 'status-success'; // Vert
+        if (s.includes('partie')) return 'status-warning'; // Jaune/Orange pour partiel
+
+        if (s.includes('retour') || s === 'annulé' || s === 'refusé' || s.includes('changer')) return 'status-danger'; // Rouge
+
+        if (s.includes('injoignable') || s.includes('reporté') || s.includes('programmé')) return 'status-warning'; // Orange
+
+        if (s.includes('cours de livraison') || s.includes('distribué')) return 'status-primary'; // Bleu vif
+
+        if (s.includes('entrepôt') || s.includes('transit') || s.includes('ramassé')) return 'status-info'; // Bleu clair
+
+        if (s.includes('attente') || s.includes('préparer') || s === 'packing') return 'status-default'; // Gris
+
+        if (s.includes('ramassage en cours')) return 'status-info';
+
+        return 'status-default';
     };
 
     const handleOpenTracking = async (order) => {
@@ -206,8 +185,12 @@ const Orders = () => {
 
         await updateOrderStatus(orderId, newStatus);
 
+        // Define generic "Failure/Return" statuses that should trigger stock return
+        const isReturnStatus = (s) => ['Retour', 'Annulé', 'Refusé', 'À changer'].includes(s);
+
         // Handle Return Logic (Stock)
-        if (newStatus === 'Retour' && previousStatus !== 'Retour') {
+        // If moving TO a return status FROM a non-return status
+        if (isReturnStatus(newStatus) && !isReturnStatus(previousStatus)) {
             const itemsToReturn = order.items || [{
                 article: order.article,
                 quantity: order.quantity || 1
@@ -233,7 +216,8 @@ const Orders = () => {
             }
         }
         // Handle Cancel Return Logic (Stock)
-        else if (previousStatus === 'Retour' && newStatus !== 'Retour') {
+        // If moving FROM a return status TO a non-return status (e.g. was Refused, now Delivered/Resent)
+        else if (isReturnStatus(previousStatus) && !isReturnStatus(newStatus)) {
             const itemsToReturn = order.items || [{
                 article: order.article,
                 quantity: order.quantity || 1
@@ -269,7 +253,12 @@ const Orders = () => {
     };
 
     const handleSendToSendit = async (order) => {
-        if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Sendit ?`)) return;
+        if (!await confirm({
+            title: 'Confirmer l\'envoi',
+            message: `Envoyer la commande #${order.displayId || order.id} à Sendit ?`,
+            confirmText: 'Envoyer',
+            variant: 'info'
+        })) return;
 
         const toastId = toast.loading("Envoi vers Sendit...");
         try {
@@ -292,7 +281,12 @@ const Orders = () => {
     };
 
     const handleSendToDelivery = async (order) => {
-        if (!window.confirm(`Envoyer la commande #${order.displayId || order.id} à Olivraison ?`)) return;
+        if (!await confirm({
+            title: 'Confirmer l\'envoi',
+            message: `Envoyer la commande #${order.displayId || order.id} à Olivraison ?`,
+            confirmText: 'Envoyer',
+            variant: 'info'
+        })) return;
 
         const toastId = toast.loading("Envoi vers Olivraison...");
         try {
@@ -360,7 +354,12 @@ const Orders = () => {
             return;
         }
 
-        if (!window.confirm(`Confirmer la demande de ramassage pour ${senditOrders.length} colis Sendit ?`)) return;
+        if (!await confirm({
+            title: 'Demande de ramassage',
+            message: `Confirmer la demande de ramassage pour ${senditOrders.length} colis Sendit ?`,
+            confirmText: 'Confirmer',
+            variant: 'info'
+        })) return;
 
         const toastId = toast.loading("Demande de ramassage en cours...");
         try {
@@ -417,7 +416,12 @@ const Orders = () => {
             return;
         }
 
-        if (!window.confirm(`Confirmer la demande de RETOUR pour ${senditOrders.length} colis Sendit ?`)) return;
+        if (!await confirm({
+            title: 'Demande de retour',
+            message: `Confirmer la demande de RETOUR pour ${senditOrders.length} colis Sendit ?`,
+            confirmText: 'Confirmer',
+            variant: 'warning'
+        })) return;
 
         const toastId = toast.loading("Demande de retour en cours...");
         try {
@@ -579,7 +583,13 @@ const Orders = () => {
     const handleDeleteOrder = async (order) => {
         if (!order) return;
         if (order.deliveryValues?.trackingID) {
-            if (window.confirm(`Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`)) {
+            if (await confirm({
+                title: 'Annulation livraison',
+                message: `Annuler cette commande chez ${order.deliveryValues.provider || 'le transporteur'} ?`,
+                confirmText: 'Oui, annuler',
+                cancelText: 'Non',
+                variant: 'warning'
+            })) {
                 const toastId = toast.loading("Annulation...");
                 try {
                     if (order.deliveryValues.provider === 'sendit') {
@@ -590,12 +600,22 @@ const Orders = () => {
                     toast.success("Annulé !", { id: toastId });
                 } catch (e) {
                     toast.error("Erreur annulation: " + e.message, { id: toastId });
-                    if (!window.confirm("Forcer la suppression locale ?")) return;
+                    if (!await confirm({
+                        title: 'Forcer la suppression ?',
+                        message: "Forcer la suppression locale malgré l'erreur ?",
+                        confirmText: 'Oui, forcer',
+                        variant: 'danger'
+                    })) return;
                 }
             }
         }
 
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer cette commande ?")) {
+        if (await confirm({
+            title: 'Supprimer la commande',
+            message: "Êtes-vous sûr de vouloir supprimer cette commande ?",
+            confirmText: 'Supprimer',
+            variant: 'danger'
+        })) {
             await deleteOrder(order.id);
             setIsModalOpen(false);
             setEditingOrder(null);
@@ -603,7 +623,12 @@ const Orders = () => {
     };
 
     const handleManualLink = async (order) => {
-        const trackingId = window.prompt("Entrez le Code de Suivi Sendit (ex: DH... ou SNDT...) :");
+        const trackingId = await prompt({
+            title: 'Lier une commande Sendit',
+            message: 'Entrez le Code de Suivi Sendit (ex: DH... ou SNDT...) :',
+            inputProps: { placeholder: 'DH...' }
+        });
+
         if (!trackingId) return;
 
         const toastId = toast.loading("Liaison en cours...");
@@ -699,14 +724,34 @@ const Orders = () => {
                 </div>
                 <div className="filter-group">
                     <Filter size={18} />
-                    <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-                        <option value="All">All Status</option>
-                        <option value="Packing">Packing</option>
-                        <option value="Ramassage">Ramassage</option>
-                        <option value="Livraison">Livraison</option>
-                        <option value="Livré">Livré</option>
-                        <option value="Pas de réponse client">Pas de réponse</option>
-                        <option value="Retour">Retour</option>
+                    <select value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-xs">
+                        <option value="All">Tous les statuts</option>
+                        <optgroup label="Préparation">
+                            <option value="Packing">Packing</option>
+                            <option value="En attente">En attente</option>
+                            <option value="À préparer">À préparer</option>
+                        </optgroup>
+                        <optgroup label="Ramassage & Transit">
+                            <option value="Ramassage en cours">Ramassage en cours</option>
+                            <option value="Ramassé">Ramassé</option>
+                            <option value="Entrepôt">Entrepôt</option>
+                            <option value="En transit">En transit</option>
+                        </optgroup>
+                        <optgroup label="Livraison">
+                            <option value="En cours de livraison">En cours de livraison</option>
+                            <option value="Distribué">Distribué</option>
+                            <option value="Injoignable">Injoignable</option>
+                            <option value="Reporté">Reporté</option>
+                            <option value="Programmé">Programmé</option>
+                        </optgroup>
+                        <optgroup label="Final">
+                            <option value="Livré">Livré</option>
+                            <option value="Livré Partiellement">Livré Partiellement</option>
+                            <option value="Retour">Retour</option>
+                            <option value="Refusé">Refusé</option>
+                            <option value="Annulé">Annulé</option>
+                            <option value="À changer">À changer (Retour)</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -902,12 +947,32 @@ const Orders = () => {
                                                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                                                             className="status-select"
                                                         >
-                                                            <option value="Packing">Packing</option>
-                                                            <option value="Ramassage">Ramassage</option>
-                                                            <option value="Livraison">Livraison</option>
-                                                            <option value="Livré">Livré</option>
-                                                            <option value="Pas de réponse client">Pas de réponse</option>
-                                                            <option value="Retour">Retour</option>
+                                                            <optgroup label="Préparation">
+                                                                <option value="Packing">Packing</option>
+                                                                <option value="En attente">En attente</option>
+                                                                <option value="À préparer">À préparer</option>
+                                                            </optgroup>
+                                                            <optgroup label="Ramassage & Transit">
+                                                                <option value="Ramassage en cours">Ramassage en cours</option>
+                                                                <option value="Ramassé">Ramassé</option>
+                                                                <option value="Entrepôt">Entrepôt</option>
+                                                                <option value="En transit">En transit</option>
+                                                            </optgroup>
+                                                            <optgroup label="Livraison">
+                                                                <option value="En cours de livraison">En cours de livraison</option>
+                                                                <option value="Distribué">Distribué</option>
+                                                                <option value="Injoignable">Injoignable</option>
+                                                                <option value="Reporté">Reporté</option>
+                                                                <option value="Programmé">Programmé</option>
+                                                            </optgroup>
+                                                            <optgroup label="Final">
+                                                                <option value="Livré">Livré</option>
+                                                                <option value="Livré Partiellement">Livré Partiellement</option>
+                                                                <option value="Retour">Retour</option>
+                                                                <option value="Refusé">Refusé</option>
+                                                                <option value="Annulé">Annulé</option>
+                                                                <option value="À changer">À changer (Retour)</option>
+                                                            </optgroup>
                                                         </select>
                                                         <button className="icon-btn-sm" onClick={() => openEditModal(order)} title="Modifier">
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>

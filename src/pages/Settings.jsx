@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import { Tag, Calendar, Percent, ShoppingBag, Bell, Box } from 'lucide-react';
 import usePushNotifications from '../hooks/usePushNotifications';
 import { useProducts } from '../context/ProductContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 
 const NotificationButton = () => {
     const { requestPermission, permission } = usePushNotifications();
@@ -25,6 +26,7 @@ const NotificationButton = () => {
 };
 
 const PromotionSettings = () => {
+    const { alert } = useConfirmation();
     const [promo, setPromo] = useState({
         isActive: false,
         type: 'none',
@@ -60,10 +62,10 @@ const PromotionSettings = () => {
         setSaving(true);
         try {
             await setDoc(doc(db, 'settings', 'promotions'), promo);
-            alert('Promotions mises à jour !');
+            await alert({ title: 'Succès', message: 'Promotions mises à jour !', variant: 'info' });
         } catch (error) {
             console.error("Error saving promotions:", error);
-            alert('Erreur lors de la sauvegarde.');
+            await alert({ title: 'Erreur', message: 'Erreur lors de la sauvegarde.', variant: 'danger' });
         } finally {
             setSaving(false);
         }
@@ -195,6 +197,7 @@ const PromotionSettings = () => {
 };
 
 const DeliverySettings = () => {
+    const { alert } = useConfirmation();
     const [settings, setSettings] = useState({
         olivraison: { apiKey: '', secretKey: '', active: true, baseUrl: 'https://partners.olivraison.com' },
         sendit: {
@@ -387,12 +390,12 @@ const DeliverySettings = () => {
                                         const data = await res.json();
 
                                         if (res.ok) {
-                                            alert("Succès: " + (data.message || "Notif envoyée !"));
+                                            await alert({ title: 'Succès', message: "Succès: " + (data.message || "Notif envoyée !"), variant: 'info' });
                                         } else {
-                                            alert("Erreur Serveur: " + (data.message || "Erreur inconnue") + "\n" + (data.error || ""));
+                                            await alert({ title: 'Erreur', message: "Erreur Serveur: " + (data.message || "Erreur inconnue") + "\n" + (data.error || ""), variant: 'danger' });
                                         }
                                     } catch (e) {
-                                        alert("Erreur Réseau/Client: " + e.message);
+                                        await alert({ title: 'Erreur', message: "Erreur Réseau/Client: " + e.message, variant: 'danger' });
                                     }
                                 }}
                                 className="text-xs text-gray-400 hover:text-gray-600 underline"
@@ -505,10 +508,16 @@ const DeliverySettings = () => {
 
 const Settings = () => {
     const { adjustStock, products } = useProducts();
+    const { confirm, alert } = useConfirmation();
     const [isFixing, setIsFixing] = useState(false);
 
     const handleFixStock = async () => {
-        if (!window.confirm("Cela va déduire le stock pour les 2 DERNIÈRES commandes. Continuer ?")) return;
+        if (!await confirm({
+            title: 'Attention',
+            message: "Cela va déduire le stock pour les 2 DERNIÈRES commandes. Continuer ?",
+            confirmText: 'Continuer',
+            variant: 'warning'
+        })) return;
         setIsFixing(true);
         try {
             const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(2));
@@ -538,9 +547,9 @@ const Settings = () => {
                     }
                 }
             }
-            alert("Correction terminée:\n" + log.join("\n"));
+            await alert({ title: 'Rapport', message: "Correction terminée:\n" + log.join("\n"), variant: 'info' });
         } catch (e) {
-            alert("Erreur: " + e.message);
+            await alert({ title: 'Erreur', message: "Erreur: " + e.message, variant: 'danger' });
         } finally {
             setIsFixing(false);
         }

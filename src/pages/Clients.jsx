@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useClients } from '../context/ClientContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 import { useOrders } from '../context/OrderContext';
 import { Search, MapPin, Users, TrendingUp, Eye, UserPlus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import CustomerDetailModal from '../components/CustomerDetailModal';
@@ -7,6 +8,7 @@ import EditClientModal from '../components/EditClientModal';
 
 export default function Clients() {
     const { clients, loading, addClient, updateClient, deleteClient } = useClients();
+    const { confirm, prompt } = useConfirmation();
     const { orders } = useOrders();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -34,7 +36,12 @@ export default function Clients() {
     };
 
     const handleDeleteClient = async (id) => {
-        if (window.confirm("Are you sure you want to delete this client? This cannot be undone.")) {
+        if (await confirm({
+            title: 'Delete Client',
+            message: "Are you sure you want to delete this client? This cannot be undone.",
+            confirmText: 'Delete',
+            variant: 'danger'
+        })) {
             await deleteClient(id);
         }
     };
@@ -68,9 +75,20 @@ export default function Clients() {
         (c.city || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleAddClient = () => {
-        const name = prompt("Enter Client Name:");
-        const phone = prompt("Enter Client Phone:");
+    const handleAddClient = async () => {
+        const name = await prompt({
+            title: 'Add Client',
+            message: "Enter Client Name:",
+            inputProps: { placeholder: 'Name' }
+        });
+        if (!name) return;
+
+        const phone = await prompt({
+            title: 'Add Client',
+            message: "Enter Client Phone:",
+            inputProps: { placeholder: 'Phone', type: 'tel' }
+        });
+
         if (name && phone) {
             addClient({ name, phone, city: '', address: '', totalOrders: 0, totalSpent: 0 });
         }
