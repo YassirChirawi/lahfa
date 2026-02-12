@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import legacy from '@vitejs/plugin-legacy'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -27,8 +28,15 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
+    legacy({
+      targets: ['defaults', 'not IE 11', 'ios >= 11'],
+    }),
   ],
+  build: {
+    target: 'es2015',
+    minify: 'terser',
+  },
   server: {
     proxy: {
       '/api/olivraison': {
