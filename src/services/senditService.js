@@ -492,6 +492,13 @@ const senditService = {
     getLabels: async (deliveries, printFormat = 1) => {
         try {
             const token = await senditService.getToken();
+            const payload = {
+                deliveries: Array.isArray(deliveries)
+                    ? deliveries
+                    : (deliveries ? deliveries.toString().split(',') : []),
+                printFormat: parseInt(printFormat || 1)
+            };
+
             const response = await fetch(`${API_BASE_URL}/deliveries/getlabels`, {
                 method: 'POST',
                 headers: {
@@ -499,7 +506,7 @@ const senditService = {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({ deliveries, printFormat })
+                body: JSON.stringify(payload)
             });
 
             let result = {};
