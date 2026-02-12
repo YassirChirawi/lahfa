@@ -13,9 +13,22 @@
   <!-- Global Error Logger & In-App Browser Detection -->
   <script>
     (function () {
-      // Catch errors that happen before the DOM is even ready
+      // 1. ServiceWorker Crash Fix (Polyfill)
+      // Instagram/DataSaver browsers often disable SW but leave the object undefined, causing crashes.
+      if (typeof navigator !== 'undefined') {
+        if (!navigator.serviceWorker) {
+          navigator.serviceWorker = {
+            register: function () { return Promise.resolve({}); },
+            ready: Promise.resolve({}),
+            addEventListener: function () { },
+            removeEventListener: function () { }
+          };
+        }
+      }
+
+      // 2. Global Error Logger
       window.onerror = function (msg, url, lineNo, columnNo, error) {
-        var message = 'Error: ' + msg + '\nLine: ' + lineNo + '\nCol: ' + columnNo;
+        var message = 'Error: ' + msg + '\nLine: ' + lineNo;
         setTimeout(function () {
           var debug = document.getElementById('debug-error');
           if (!debug) {
@@ -24,33 +37,31 @@
             debug.style = 'position:fixed;top:0;left:0;width:100%;background:#A62B2B;color:white;z-index:999999;padding:15px;font-size:12px;word-break:break-all;box-shadow:0 4px 10px rgba(0,0,0,0.3);';
             document.body.appendChild(debug);
           }
-          debug.innerHTML = "<strong>⚠️ Erreur Système Détectée :</strong><br/>" + message.replace(/\n/g, '<br/>');
+          debug.innerHTML = "<strong>⚠️ Erreur Système :</strong><br/>" + message;
         }, 100);
         return false;
       };
 
-      // Detect Instagram/FB on iOS
-      var ua = navigator.userAgent || navigator.vendor || window.opera;
-      var isInstagram = (ua.indexOf('Instagram') > -1) || (ua.indexOf('FBAN') > -1) || (ua.indexOf('FBAV') > -1);
-
-      if (isInstagram && /iPhone|iPad|iPod/.test(ua)) {
-        document.addEventListener('DOMContentLoaded', function () {
+      // 3. Failsafe: Show instructions if app doesn't load in 4 seconds
+      setTimeout(function () {
+        var root = document.getElementById('root');
+        if (!root || root.innerHTML.trim() === '') {
+          var ua = navigator.userAgent || navigator.vendor || window.opera;
           var prompt = document.createElement('div');
-          prompt.style = 'position:fixed;top:20px;left:20px;right:20px;background:#000;color:white;padding:20px;border-radius:20px;z-index:999998;text-align:center;font-size:14px;box-shadow:0 15px 40px rgba(0,0,0,0.6);border:2px solid #ff0080;';
-          prompt.innerHTML = "<div style='font-size:24px;margin-bottom:10px;'>💡 Conseil Instagram</div>" +
-            "Instagram bloque souvent l'affichage. Si la page reste blanche :<br/><br/>" +
-            "1. Cliquez sur les <strong>3 points (•••)</strong> en haut à droite<br/>" +
-            "2. Choisissez <strong>'Ouvrir dans Safari'</strong>.<br/><br/>";
+          prompt.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;color:white;z-index:999998;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-family:sans-serif;';
 
-          var close = document.createElement('div');
-          close.innerHTML = "FERMER";
-          close.style = 'margin-top:10px;font-weight:bold;color:#ff0080;cursor:pointer;background:rgba(255,255,255,0.1);padding:10px;border-radius:10px;';
-          close.onclick = function () { prompt.remove(); };
+          var actionText = /iPhone|iPad|iPod/.test(ua) ? "Ouvrir dans Safari" : "Ouvrir dans Chrome";
 
-          prompt.appendChild(close);
+          prompt.innerHTML = "<h1 style='font-size:24px;margin-bottom:20px;'>⚠️ Affichage Bloqué</h1>" +
+            "<p style='margin-bottom:30px;color:#ccc;'>Le navigateur intégré bloque l'application.</p>" +
+            "<div style='background:#ff0080;color:white;padding:15px 30px;border-radius:30px;font-weight:bold;font-size:18px;margin-bottom:20px;'>" +
+            "1. Cliquez sur les 3 points (•••) ↗️<br/>2. Choisissez '" + actionText + "'" +
+            "</div>" +
+            "<button onclick='location.reload()' style='background:transparent;border:1px solid #666;color:#888;padding:10px 20px;border-radius:10px;margin-top:20px;'>Réessayer</button>";
+
           document.body.appendChild(prompt);
-        });
-      }
+        }
+      }, 4000);
     })();
   </script>
 

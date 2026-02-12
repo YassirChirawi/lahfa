@@ -11,22 +11,27 @@ export const SecurityProvider = ({ children }) => {
     const [hasBiometrics, setHasBiometrics] = useState(false);
 
     // Check for biometric availability on mount
+    // Check for biometric availability on mount - NON-BLOCKING & FAILSAFE
     useEffect(() => {
-        try {
-            if (window.PublicKeyCredential && typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
-                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-                    .then(available => setHasBiometrics(!!available))
-                    .catch(err => {
-                        console.warn("Bio Check Suppressed:", err);
-                        setHasBiometrics(false);
-                    });
-            } else {
+        const checkBiometrics = async () => {
+            try {
+                if (typeof window !== 'undefined' &&
+                    window.PublicKeyCredential &&
+                    typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+
+                    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                    setHasBiometrics(!!available);
+                } else {
+                    setHasBiometrics(false);
+                }
+            } catch (e) {
+                // Squelch all errors here to prevent startup crash
+                console.warn("Bio Init Skipped");
                 setHasBiometrics(false);
             }
-        } catch (e) {
-            console.warn("Security Context Init Error (Suppressed):", e);
-            setHasBiometrics(false);
-        }
+        };
+
+        checkBiometrics();
     }, []);
 
     const unlock = (code) => {

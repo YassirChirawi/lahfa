@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { PromotionsProvider } from './hooks/usePromotions';
 import { ConfirmationProvider } from './context/ConfirmationContext';
 import MainLayout from './layout/MainLayout';
@@ -62,7 +62,7 @@ const AppContent = () => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <SecurityProvider>
         <PromotionsProvider>
           <ConfirmationProvider>
@@ -80,7 +80,7 @@ function App() {
           </ConfirmationProvider>
         </PromotionsProvider>
       </SecurityProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
