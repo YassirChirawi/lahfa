@@ -1,7 +1,7 @@
 // Default Templates (French) - Using user's specific formulations where available + snippet structure
 export const DEFAULT_TEMPLATES = {
     'packing': "Bonjour [Client] 💖\nMerci pour votre commande chez [Store] !\n\nVoici les détails de votre commande :\n\n📞 Numéro joignable :\n[Phone]\n\n📍 Adresse de livraison :\n[Adresse], [Ville]\n\n💰 Total (articles + livraison) :\n[Total] DH\n\n[Ticket]\n\n💳 Paiement à la livraison.\n\n🚚 Livraison entre 24h et 48h maximum.\n\n👉 Merci de réagir avec un 👍 pour confirmer votre commande.\nLa livraison sera envoyée uniquement après votre confirmation.\n\n📦 Une fois votre commande arrivée dans votre ville, nous vous enverrons un message pour vous informer que vous serez livrée le jour même.\n\nMerci pour votre confiance et bienvenue dans l’univers LAHFA ✨🤍",
-    'ramassage': "Bonjour [Client], votre commande est prête et sera bientôt remise au livreur.",
+    'ramassage': "Bonjour [Client], votre commande est prête et sera bientôt remise au livreur.\n[TrackingLink]",
     'livraison': "Bonjour [Client] 🤍\nVotre commande est arrivée dans votre ville. Attendez l'appel du livreur très prochainement pour la livraison 🚚.\n[TrackingLink]\nMerci de rester joignable ! 🌸",
     'livré': "Bonjour [Client] ✨\nMerci infiniment 🌸\nNous espérons que votre commande vous apporte entière satisfaction 🤍\nCe message confirme la bonne réception de votre article Lahfa’h 💌",
     'pas de réponse client': "Bonjour [Client] 🌸, nous avons tenté de vous joindre concernant votre commande LAHFA mais sans succès. Quand seriez-vous disponible ? Merci ✨",
@@ -12,7 +12,7 @@ export const DEFAULT_TEMPLATES = {
 // Darija Templates
 export const DARIJA_TEMPLATES = {
     'packing': "Salam [Client] 💖, wslatna la commande dialk f [Store] !\n\n📄 *Tafassil* :\n[Ticket]\n💰 Total: [Total] DH\n\nBach nsiftoha lik l [Ville], momkin t'akder lina l'adresse o lweqt ? Jawbna b 'OUI' bach nvalidiw. ✅\n\nIla kan kulchi howa hadak, dir lina pouce 👍",
-    'ramassage': "Salam [Client] 📦, commande dialk wjdat bach n3tiwha l livreur.",
+    'ramassage': "Salam [Client] 📦, commande dialk wjdat bach n3tiwha l livreur.\n[TrackingLink]",
     'livraison': "Salam [Client] 🤍, ra livreur jay 3endk l [Ville].\n7di m3a ton tel ghadi i3eyet lik 9rib 📞.\n[TrackingLink]\nChokran 🌸",
     'livré': "Salam [Client] ✨\nCommande dialk wslatek. Chokran hit teqti fina o ntmenaw ikon produit 3ejbek 💌\nMerhba bik f [Store] 🌸",
     'pas de réponse client': "Salam [Client] 🌸, livreur 3eyet likom o malqakomch 📞. Mazal baghin la commande ? Chokran ✨.",
