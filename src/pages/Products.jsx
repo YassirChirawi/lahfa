@@ -136,7 +136,7 @@ const Products = () => {
         if (filterMaxPrice) params.append('maxPrice', filterMaxPrice);
         if (filterStock !== 'all') params.append('stock', filterStock);
 
-        const url = `${window.location.origin}/catalogue?${params.toString()}`;
+        const url = `${window.location.origin}/#/catalogue?${params.toString()}`;
         navigator.clipboard.writeText(url);
         toast.success("Lien du catalogue copié !");
     };

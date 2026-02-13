@@ -10,7 +10,7 @@ import BannerCarousel from '../components/BannerCarousel';
 import DecorativeBackground from '../components/DecorativeBackground';
 
 const Catalogue = () => {
-    const { products } = useProducts();
+    const { products, loading } = useProducts();
     const { promo } = usePromotions();
     const [searchParams] = useSearchParams();
     const [zoomedProduct, setZoomedProduct] = useState(null);
@@ -88,6 +88,7 @@ const Catalogue = () => {
     }), [searchParams]);
 
     const filteredProducts = useMemo(() => {
+        if (loading) return [];
         return products.filter(product => {
             // Category Filter
             if (filters.category && product.category !== filters.category) return false;
@@ -106,15 +107,15 @@ const Catalogue = () => {
             // Search Text
             if (filters.search) {
                 const searchLower = filters.search.toLowerCase();
-                const matchName = product.name.toLowerCase().includes(searchLower);
+                const matchName = product.name?.toLowerCase().includes(searchLower);
                 if (!matchName) return false;
             }
 
             return true;
         }).sort((a, b) => {
-            return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+            return a.name?.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }) || 0;
         });
-    }, [products, filters]);
+    }, [products, filters, loading]);
 
     const handleInstagram = (product) => {
         const refText = `Produit: ${product.name} - ${product.price}DH`;
@@ -200,7 +201,12 @@ const Catalogue = () => {
             {/* Content */}
             <main className="max-w-7xl mx-auto p-4 md:p-8 relative z-10">
 
-                {filteredProducts.length === 0 ? (
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mb-4"></div>
+                        <p className="text-gray-500 font-medium">Chargement des trésors...</p>
+                    </div>
+                ) : filteredProducts.length === 0 ? (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}

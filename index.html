@@ -13,6 +13,13 @@
   <!-- Global Error Logger & In-App Browser Detection -->
   <script>
     (function () {
+      // 0. Path-to-Hash Redirect (Public Catalogue Fix)
+      // If user lands on /catalogue, redir to /#/catalogue so HashRouter sees it as public
+      if (window.location.pathname === '/catalogue' || window.location.pathname === '/catalogue/') {
+        window.location.replace('/#/catalogue' + window.location.search);
+        return; // Stop execution to allow redirect
+      }
+
       // 1. ServiceWorker Crash Fix (Polyfill)
       // Instagram/DataSaver browsers often disable SW but leave the object undefined, causing crashes.
       if (typeof navigator !== 'undefined') {
