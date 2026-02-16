@@ -2,7 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useClients } from '../context/ClientContext';
 import { useConfirmation } from '../context/ConfirmationContext';
 import { useOrders } from '../context/OrderContext';
-import { Search, MapPin, Users, TrendingUp, Eye, UserPlus, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { useClientSegmentation } from '../hooks/useClientSegmentation';
+import { generateMarketingMessage } from '../services/aiService';
+import { toast } from 'react-hot-toast';
+import { Search, MapPin, Users, TrendingUp, Eye, UserPlus, Edit, Trash2, AlertTriangle, Sparkles, MessageCircle } from 'lucide-react';
 import CustomerDetailModal from '../components/CustomerDetailModal';
 import EditClientModal from '../components/EditClientModal';
 
@@ -13,18 +16,10 @@ export default function Clients() {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [editingClient, setEditingClient] = useState(null);
+    const [generatingId, setGeneratingId] = useState(null);
 
-    const customersWithStats = useMemo(() => {
-        return clients.map(client => {
-            const clientOrders = orders.filter(o => o.phone === client.phone);
-            const stats = {
-                delivered: clientOrders.filter(o => o.status === 'Livré').length,
-                returned: clientOrders.filter(o => o.status === 'Retour').length,
-                cancelled: clientOrders.filter(o => o.status === 'Pas de réponse client' || o.status === 'Annulé').length
-            };
-            return { ...client, stats };
-        });
-    }, [clients, orders]);
+    // Use our new Smart Segmentation Hook
+    const customersWithSegments = useClientSegmentation(clients, orders);
 
     const handleEditClient = (client) => {
         setEditingClient(client);
@@ -43,6 +38,52 @@ export default function Clients() {
             variant: 'danger'
         })) {
             await deleteClient(id);
+        }
+    };
+
+    const handleGenerateMessage = async (client) => {
+        setGeneratingId(client.id);
+        try {
+            const message = await generateMarketingMessage(client.segment?.name, client.name);
+
+            // Copy to clipboard or open WhatsApp directly
+            // For now, let's show in a toast with action
+            toast.custom((t) => (
+                <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+                    <div className="flex-1 w-0 p-4">
+                        <div className="flex items-start">
+                            <div className="flex-shrink-0 pt-0.5">
+                                <Sparkles className="h-10 w-10 text-indigo-500" />
+                            </div>
+                            <div className="ml-3 flex-1">
+                                <p className="text-sm font-medium text-gray-900">
+                                    AI Suggestion for {client.name}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-500">
+                                    {message}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex border-l border-gray-200">
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(message);
+                                toast.dismiss(t.id);
+                                toast.success("Copié !");
+                            }}
+                            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            Copier
+                        </button>
+                    </div>
+                </div>
+            ), { duration: 5000 });
+
+        } catch (error) {
+            toast.error("Erreur de l'IA");
+        } finally {
+            setGeneratingId(null);
         }
     };
 
@@ -69,10 +110,11 @@ export default function Clients() {
         };
     }, [clients]);
 
-    const filteredCustomers = customersWithStats.filter(c =>
+    const filteredCustomers = customersWithSegments.filter(c =>
         (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.phone || '').includes(searchTerm) ||
-        (c.city || '').toLowerCase().includes(searchTerm.toLowerCase())
+        (c.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.segment?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleAddClient = async () => {
@@ -99,10 +141,9 @@ export default function Clients() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 page-header">
                 <div>
-                    <h1>Customers</h1>
-                    <p>View customer profiles, lifetime value, and history.</p>
+                    <h1>Customers & AI Insights</h1>
+                    <p>View customer profiles, lifetime value, and smart segments.</p>
                 </div>
-                {/* Optional Add Client Button (kept for functionality, though not in screenshot) */}
                 <button
                     className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 font-medium"
                     onClick={handleAddClient}
@@ -154,7 +195,7 @@ export default function Clients() {
                     <input
                         type="text"
                         className="block w-full pl-11 pr-4 py-3 border-none leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-0 sm:text-sm"
-                        placeholder="Search by Name, Phone, or City..."
+                        placeholder="Search by Name, Phone, City, or Segment (e.g., 'Champion')..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -167,9 +208,8 @@ export default function Clients() {
                     <thead>
                         <tr>
                             <th>Client</th>
-                            <th>Phone</th>
-                            <th>City</th>
-                            <th>Total Orders</th>
+                            <th>Segment (AI)</th>
+                            <th>History</th>
                             <th>Total Spent</th>
                             <th>Last Order</th>
                             <th className="text-right">Actions</th>
@@ -177,27 +217,66 @@ export default function Clients() {
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="7" className="px-6 py-5 text-center">Loading...</td></tr>
+                            <tr><td colSpan="6" className="px-6 py-5 text-center">Loading...</td></tr>
                         ) : filteredCustomers.length === 0 ? (
-                            <tr><td colSpan="7" className="px-6 py-5 text-center text-gray-500">No customers found.</td></tr>
+                            <tr><td colSpan="6" className="px-6 py-5 text-center text-gray-500">No customers found.</td></tr>
                         ) : filteredCustomers.map((customer) => (
                             <tr key={customer.id} className={customer.stats?.returned > 0 ? 'bg-red-50' : ''}>
-                                <td className="font-semibold text-gray-900 flex items-center gap-2">
-                                    {customer.name}
-                                    {customer.stats?.returned > 0 && (
-                                        <div className="text-red-600" title={`Has ${customer.stats.returned} returned orders`}>
-                                            <AlertTriangle size={16} />
+                                <td className="font-semibold text-gray-900">
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            {customer.name}
+                                            {customer.stats?.returned > 0 && (
+                                                <div className="text-red-600" title={`Has ${customer.stats.returned} returned orders`}>
+                                                    <AlertTriangle size={16} />
+                                                </div>
+                                            )}
                                         </div>
+                                        <span className="text-xs text-gray-500 font-normal">{customer.phone}</span>
+                                        <span className="text-xs text-gray-400 font-normal capitalize">{customer.city || '-'}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {customer.segment && (
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${customer.segment.color}-100 text-${customer.segment.color}-800 border border-${customer.segment.color}-200`}>
+                                            {customer.segment.name}
+                                        </span>
                                     )}
                                 </td>
-                                <td className="text-gray-500">{customer.phone}</td>
-                                <td className="text-gray-500">{customer.city || '-'}</td>
-                                <td className="text-gray-500">{customer.totalOrders || customer.orderCount || 0}</td>
-                                <td className="font-medium text-green-600">
-                                    {customer.totalSpent ? `${customer.totalSpent.toFixed(2)} DH` : '0.00 DH'}
+                                <td className="text-gray-500">
+                                    <div className="flex flex-col text-xs">
+                                        <span>{customer.stats?.frequency || 0} Orders</span>
+                                        {Object.entries(customer.stats || {}).map(([k, v]) => v > 0 && k !== 'total' && k !== 'recency' && k !== 'frequency' && k !== 'monetary' && k !== 'isLive' && (
+                                            <span key={k} className={k === 'delivered' ? 'text-green-600' : 'text-red-500'}>
+                                                {v} {k}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </td>
-                                <td className="text-gray-500">{customer.lastOrderDate || '-'}</td>
+                                <td className="font-medium text-green-600">
+                                    {customer.stats?.monetary ? `${customer.stats.monetary.toFixed(2)} DH` : '0.00 DH'}
+                                </td>
+                                <td className="text-gray-500 text-sm">
+                                    {customer.lastOrderDate || 'Never'}
+                                    <div className="text-xs text-gray-400">
+                                        {customer.stats?.recency !== 999 ? `${customer.stats.recency} days ago` : ''}
+                                    </div>
+                                </td>
                                 <td className="text-right">
+                                    {/* AI Action Button */}
+                                    <button
+                                        onClick={() => handleGenerateMessage(customer)}
+                                        className="text-purple-600 hover:text-purple-900 p-2 hover:bg-purple-50 rounded-full transition-colors mr-1"
+                                        title="AI Marketing Message"
+                                        disabled={generatingId === customer.id}
+                                    >
+                                        {generatingId === customer.id ? (
+                                            <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                                        ) : (
+                                            <Sparkles className="h-4 w-4" />
+                                        )}
+                                    </button>
+
                                     <button
                                         onClick={() => handleEditClient(customer)}
                                         className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-full transition-colors mr-1"

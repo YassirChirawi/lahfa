@@ -29,7 +29,8 @@ const Products = () => {
         size: '',
         color: '',
         category: '',
-        badge: ''
+        badge: '',
+        description: ''
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
@@ -73,7 +74,7 @@ const Products = () => {
             setImagePreview(product.image || '');
         } else {
             setEditingProduct(null);
-            setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '', category: '', badge: '' });
+            setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '', category: '', badge: '', description: '' });
             setImagePreview('');
         }
         setImageFile(null);
@@ -115,6 +116,34 @@ const Products = () => {
             setUploading(false);
         }
     };
+
+    const handleMagicWrite = async () => {
+        if (!formData.name && !formData.category) {
+            toast.error("Veuillez entrer au moins un nom et une catégorie pour inspirer l'IA ! 🧠");
+            return;
+        }
+
+        const toastId = toast.loading("L'IA rédige votre description... ✨");
+        try {
+            // Import dynamique pour éviter les dépendances circulaires si nécessaire, 
+            // ou juste utiliser l'import du haut si déjà fait.
+            const { generateProductDescription } = await import('../services/aiService');
+
+            const description = await generateProductDescription(
+                formData.name,
+                formData.category,
+                formData.color,
+                formData.image // Pass image URL mostly for future real API usage
+            );
+
+            setFormData(prev => ({ ...prev, description }));
+            toast.success("Description générée avec succès ! 💖", { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error("L'IA a eu un petit  hoquet. Réessayez !", { id: toastId });
+        }
+    };
+
 
     const handleDelete = async (id) => {
         if (await confirm({
@@ -379,6 +408,27 @@ const Products = () => {
                                         onChange={e => setFormData({ ...formData, badge: e.target.value })}
                                     />
                                 </div>
+                            </div>
+
+                            {/* Description Field with Magic Write */}
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                                    <button
+                                        type="button"
+                                        onClick={handleMagicWrite}
+                                        className="text-xs bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-2 py-1 rounded-full flex items-center gap-1 hover:shadow-md transition animate-pulse-slow"
+                                        title="Générer une description avec l'IA"
+                                    >
+                                        ✨ Magic Write
+                                    </button>
+                                </div>
+                                <textarea
+                                    className="w-full p-2 border rounded-lg h-24 text-sm resize-none"
+                                    placeholder="Description du produit..."
+                                    value={formData.description || ''}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3 mt-6 pt-4 border-t">

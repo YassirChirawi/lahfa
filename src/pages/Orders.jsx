@@ -43,6 +43,10 @@ const Orders = () => {
     const [selectedOrders, setSelectedOrders] = useState([]); // Multiple selection for ramassage
     const [highlightId, setHighlightId] = useState(null); // Local highlight state
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
+
     // WhatsApp Modal State
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [whatsappOrder, setWhatsappOrder] = useState(null);
@@ -110,6 +114,18 @@ const Orders = () => {
 
         return matchesStatus && matchesSearch && matchesCity && matchesProduct && matchesDate && matchesMinPrice && matchesMaxPrice;
     });
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    const paginatedOrders = filteredOrders.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Reset page on filter change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter, searchTerm, cityFilter, productFilter, dateFilter, minPrice, maxPrice, showTrash]);
 
 
 
@@ -923,8 +939,8 @@ const Orders = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredOrders.length > 0 ? (
-                            filteredOrders.map(order => {
+                        {paginatedOrders.length > 0 ? (
+                            paginatedOrders.map(order => {
                                 // Backward compatibility helper
                                 const items = order.items || [{
                                     article: order.article,
@@ -1117,6 +1133,62 @@ const Orders = () => {
                         )}
                     </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {filteredOrders.length > 0 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 sm:px-6">
+                        <div className="flex justify-between flex-1 sm:hidden">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                Précédent
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className={`relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium rounded-md ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                Suivant
+                            </button>
+                        </div>
+                        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm text-gray-700">
+                                    Affichage de <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> à <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span> sur <span className="font-medium">{filteredOrders.length}</span> résultats
+                                </p>
+                            </div>
+                            <div>
+                                <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        Précédent
+                                    </button>
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <button
+                                            key={i + 1}
+                                            onClick={() => setCurrentPage(i + 1)}
+                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1 ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        Suivant
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div >
 
             <CreateOrderModal
