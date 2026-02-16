@@ -23,6 +23,7 @@ const Products = () => {
 
     const [formData, setFormData] = useState({
         name: '',
+        ref: '',
         price: '',
         stock: '',
         image: '',
@@ -37,7 +38,8 @@ const Products = () => {
 
     const filteredProducts = products
         .filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (p.ref && p.ref.toLowerCase().includes(searchTerm.toLowerCase()));
             const matchesColor = filterColor ? (p.color && p.color.toLowerCase().includes(filterColor.toLowerCase())) : true;
             const matchesMinPrice = filterMinPrice ? parseFloat(p.price) >= parseFloat(filterMinPrice) : true;
             const matchesMaxPrice = filterMaxPrice ? parseFloat(p.price) <= parseFloat(filterMaxPrice) : true;
@@ -74,7 +76,7 @@ const Products = () => {
             setImagePreview(product.image || '');
         } else {
             setEditingProduct(null);
-            setFormData({ name: '', price: '', stock: '', image: '', size: '', color: '', category: '', badge: '', description: '' });
+            setFormData({ name: '', ref: '', price: '', stock: '', image: '', size: '', color: '', category: '', badge: '', description: '' });
             setImagePreview('');
         }
         setImageFile(null);
@@ -117,27 +119,42 @@ const Products = () => {
         }
     };
 
+    const [magicLang, setMagicLang] = useState('fr'); // 'fr' or 'darija'
+
     const handleMagicWrite = async () => {
-        if (!formData.name && !formData.category) {
-            toast.error("Veuillez entrer au moins un nom et une catégorie pour inspirer l'IA ! 🧠");
+        if (!formData.category) {
+            toast.error("Veuillez choisir au moins une catégorie pour inspirer l'IA ! 🧠");
             return;
         }
 
-        const toastId = toast.loading("L'IA rédige votre description... ✨");
+        const toastId = toast.loading(`L'IA rédige en ${magicLang === 'darija' ? 'Darija' : 'Français'}... ✨`);
         try {
-            // Import dynamique pour éviter les dépendances circulaires si nécessaire, 
-            // ou juste utiliser l'import du haut si déjà fait.
             const { generateProductDescription } = await import('../services/aiService');
 
-            const description = await generateProductDescription(
-                formData.name,
+            // LOGIQUE INTELLIGENTE DE REFERENCE:
+            let currentRef = formData.ref;
+            if (!currentRef && formData.name) {
+                currentRef = formData.name;
+            }
+
+            const baseInput = currentRef || formData.name || 'Produit';
+
+            const result = await generateProductDescription(
+                baseInput,
                 formData.category,
                 formData.color,
-                formData.image // Pass image URL mostly for future real API usage
+                formData.image,
+                magicLang // Pass selected language
             );
 
-            setFormData(prev => ({ ...prev, description }));
-            toast.success("Description générée avec succès ! 💖", { id: toastId });
+            setFormData(prev => ({
+                ...prev,
+                ref: currentRef,
+                name: result.title,
+                description: result.description
+            }));
+
+            toast.success("Nom Marketing & Description générés ! 💖", { id: toastId });
         } catch (error) {
             console.error(error);
             toast.error("L'IA a eu un petit  hoquet. Réessayez !", { id: toastId });
@@ -308,7 +325,10 @@ const Products = () => {
                             </div>
                         </div>
                         <div className="p-4">
-                            <h3 className="font-bold text-gray-900">{product.name}</h3>
+                            <h3 className="font-bold text-gray-900">
+                                <span className="text-gray-500 text-sm font-normal mr-2">{product.ref}</span>
+                                {product.name}
+                            </h3>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-indigo-600 font-bold">{parseFloat(product.price).toFixed(2)} DH</span>
                                 <span className={`text-xs px-2 py-1 rounded-full ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -356,9 +376,15 @@ const Products = () => {
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                                <input required type="text" className="w-full p-2 border rounded-lg" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Reference</label>
+                                    <input required type="text" className="w-full p-2 border rounded-lg" value={formData.ref} onChange={e => setFormData({ ...formData, ref: e.target.value })} placeholder="ex: BAM001" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Marketing Name</label>
+                                    <input required type="text" className="w-full p-2 border rounded-lg" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Généré par IA..." />
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -414,14 +440,32 @@ const Products = () => {
                             <div>
                                 <div className="flex justify-between items-center mb-1">
                                     <label className="block text-sm font-medium text-gray-700">Description</label>
-                                    <button
-                                        type="button"
-                                        onClick={handleMagicWrite}
-                                        className="text-xs bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-2 py-1 rounded-full flex items-center gap-1 hover:shadow-md transition animate-pulse-slow"
-                                        title="Générer une description avec l'IA"
-                                    >
-                                        ✨ Magic Write
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex bg-gray-100 rounded-lg p-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setMagicLang('fr')}
+                                                className={`text-[10px] px-2 py-0.5 rounded-md transition ${magicLang === 'fr' ? 'bg-white shadow text-indigo-600 font-bold' : 'text-gray-500'}`}
+                                            >
+                                                🇫🇷 FR
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setMagicLang('darija')}
+                                                className={`text-[10px] px-2 py-0.5 rounded-md transition ${magicLang === 'darija' ? 'bg-white shadow text-green-600 font-bold' : 'text-gray-500'}`}
+                                            >
+                                                🇲🇦 Darija
+                                            </button>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleMagicWrite}
+                                            className="text-xs bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-2 py-1 rounded-full flex items-center gap-1 hover:shadow-md transition animate-pulse-slow"
+                                            title="Générer une description avec l'IA"
+                                        >
+                                            ✨ Magic Write
+                                        </button>
+                                    </div>
                                 </div>
                                 <textarea
                                     className="w-full p-2 border rounded-lg h-24 text-sm resize-none"

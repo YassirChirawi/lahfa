@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { useCollections } from '../context/CollectionContext';
-import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download, FileText, RefreshCw } from 'lucide-react';
+import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download, FileText, RefreshCw, Wallet } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'; // Removed BarChart/Bar as unused
 import Modal from '../components/Modal';
 import FloatingActionButton from '../components/FloatingActionButton';
@@ -56,6 +56,80 @@ const Finances = () => {
     const [newCollection, setNewCollection] = useState({ name: '', startDate: '', endDate: '' });
     const [invoices, setInvoices] = useState([]);
     const [isSenditActive, setIsSenditActive] = useState(false);
+
+    // Simulator State
+    const [simulator, setSimulator] = useState({
+        totalCost: '',
+        itemCount: '',
+        desiredMargin: '',
+        deliveryCost: 35,
+        packCost: 5,
+        returnRate: 20 // %
+    });
+
+    const simulatorPlan = useMemo(() => {
+        const cost = parseFloat(simulator.totalCost);
+        const qty = parseFloat(simulator.itemCount);
+        const margin = parseFloat(simulator.desiredMargin);
+
+        if (!cost || !qty || !margin) return null;
+
+        // Calculations
+        // 1. Cost per item (COGS)
+        const unitCost = cost / qty;
+
+        // 2. We need to find Selling Price (P)
+        // Formula: Total Revenue - Total Cost = Target Margin
+        // Total Cost = Purchase + (Qty * P * Ads%)? No, let's fix CPA.
+
+        // Let's assume a healthy CPA is around 25-30% of selling price? No, that's high. 
+        // Or let's imply that Revenue = Purchase + Margin + Delivery + Pack + ADS.
+        // We know everything except Ads and Price.
+
+        // Let's do a bottom-up with a standard Ad Ratio (e.g. 30% of Price goes to Ads + Delivery)
+        // Or simpler: Let's aim for a Selling Price that gives meaningful ROI.
+
+        // Let's Try: Selling Price = (Unit Cost + Unit Margin + Delivery + Pack + DesiredCPA) / (1 - ReturnRateImpact?)
+        // Too complex.
+
+        // Simpler Reverse Engineering:
+        // Total Needed Revenue = Total Cost + Total Delivery + Total Pack + Total Ads + Target Margin
+        // We don't know Ads.
+        // Let's set a standard "Marketing Budget" Ratio based on typical successful stores (e.g. marketing = 30% of revenue).
+        // Revenue = Cost + Margin + Fees + 0.3 * Revenue
+        // 0.7 * Revenue = Cost + Margin + Fees
+        // Revenue = (Cost + Margin + Fees) / 0.7
+
+        const totalDelivery = qty * simulator.deliveryCost;
+        const totalPack = qty * simulator.packCost;
+
+        // Initial estimate without ads
+        const baseNeed = cost + margin + totalDelivery + totalPack;
+
+        // Apply Marketing Multiplier (Assuming Ads should be max 25% of turnover for health)
+        const AD_SPEND_RATIO = 0.25;
+        const totalRevenueTarget = baseNeed / (1 - AD_SPEND_RATIO);
+
+        const unitPrice = totalRevenueTarget / qty;
+        const totalAdsBudget = totalRevenueTarget * AD_SPEND_RATIO;
+        const targetCPA = totalAdsBudget / qty;
+
+        // ROI
+        const roi = (margin / cost) * 100;
+
+        return {
+            sellingPrice: Math.ceil(unitPrice / 5) * 5 - 1, // Round to psychological price (e.g. 199, 249)
+            targetCPA: Math.floor(targetCPA),
+            velocity: Math.ceil(qty / 30), // Sell in 1 month default
+            breakdown: {
+                cost: Math.round(unitCost),
+                margin: Math.round(margin / qty),
+                delivery: simulator.deliveryCost,
+                pack: simulator.packCost
+            },
+            roi: roi.toFixed(0)
+        };
+    }, [simulator]);
 
     // Set default selected collection to the most recent one on load
     useEffect(() => {
@@ -306,6 +380,12 @@ const Finances = () => {
                         className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'collections' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Par Collection
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('simulator')}
+                        className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'simulator' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <TrendingUp size={16} /> Simulateur 🔮
                     </button>
                 </div>
             </div>
@@ -646,6 +726,170 @@ const Finances = () => {
                     </div>
                 </div>
             </Modal>
+            {/* --- SIMULATOR VIEW CONTENT --- */}
+            {activeTab === 'simulator' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* 1. INPUTS */}
+                        <div className="card p-6 h-fit bg-white border border-indigo-100 shadow-lg">
+                            <div className="flex items-center gap-2 mb-6 text-indigo-800 border-b border-indigo-50 pb-4">
+                                <div className="p-2 bg-indigo-100 rounded-lg"><Activity size={20} /></div>
+                                <h3 className="text-xl font-bold">Paramètres Collection</h3>
+                            </div>
+
+                            <div className="space-y-5">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Coût Achat Global (Marchandise)</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            className="w-full pl-3 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium text-gray-900"
+                                            placeholder="Ex: 5000"
+                                            value={simulator.totalCost}
+                                            onChange={e => setSimulator({ ...simulator, totalCost: e.target.value })}
+                                        />
+                                        <span className="absolute right-3 top-3 text-gray-400 font-bold">DH</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Quantité (Pièces)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium text-gray-900"
+                                        placeholder="Ex: 50"
+                                        value={simulator.itemCount}
+                                        onChange={e => setSimulator({ ...simulator, itemCount: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-100">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Objectif Marge Nette</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setSimulator({ ...simulator, desiredMargin: parseFloat(simulator.totalCost) * 0.5 || '' })}
+                                            className="px-3 py-1 text-xs bg-gray-100 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 rounded-lg transition"
+                                        >
+                                            x1.5 (50%)
+                                        </button>
+                                        <button
+                                            onClick={() => setSimulator({ ...simulator, desiredMargin: parseFloat(simulator.totalCost) * 1 || '' })}
+                                            className="px-3 py-1 text-xs bg-gray-100 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 rounded-lg transition"
+                                        >
+                                            x2 (100%)
+                                        </button>
+                                        <button
+                                            onClick={() => setSimulator({ ...simulator, desiredMargin: parseFloat(simulator.totalCost) * 2 || '' })}
+                                            className="px-3 py-1 text-xs bg-gray-100 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 rounded-lg transition"
+                                        >
+                                            x3 (200%)
+                                        </button>
+                                    </div>
+                                    <div className="relative mt-2">
+                                        <input
+                                            type="number"
+                                            className="w-full pl-3 pr-10 py-3 border border-green-200 ring-1 ring-green-100 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all font-bold text-green-700 bg-green-50/30"
+                                            placeholder="Bénéfice visé (ex: 5000)"
+                                            value={simulator.desiredMargin}
+                                            onChange={e => setSimulator({ ...simulator, desiredMargin: e.target.value })}
+                                        />
+                                        <span className="absolute right-3 top-3 text-green-600 font-bold">DH</span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1 text-right">Marge NETTE (après TOUS frais)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. RESULTS (THE PLAN) */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {simulatorPlan ? (
+                                <>
+                                    <div className="card p-6 bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-xl relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+                                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 relative z-10">
+                                            <TrendingUp className="text-yellow-300" /> Plan Stratégique Recommandé
+                                        </h3>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                                            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+                                                <p className="text-indigo-200 text-sm font-medium mb-1">Prix de Vente Unitaire</p>
+                                                <p className="text-3xl font-bold text-white tracking-tight">{simulatorPlan.sellingPrice} DH</p>
+                                                <p className="text-xs text-indigo-300 mt-1">Prix conseillé pour atteindre la cible</p>
+                                            </div>
+                                            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+                                                <p className="text-purple-200 text-sm font-medium mb-1">Budget Pub Max / Cmd</p>
+                                                <p className="text-3xl font-bold text-yellow-300 tracking-tight">{simulatorPlan.targetCPA} DH</p>
+                                                <p className="text-xs text-purple-300 mt-1">CPA Cible (Coût par Achat)</p>
+                                            </div>
+                                            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+                                                <p className="text-indigo-200 text-sm font-medium mb-1">Rythme de Vente</p>
+                                                <div className="flex items-baseline gap-1">
+                                                    <p className="text-3xl font-bold text-white tracking-tight">{simulatorPlan.velocity}</p>
+                                                    <span className="text-sm">Cmds / jour</span>
+                                                </div>
+                                                <p className="text-xs text-indigo-300 mt-1">Pour écouler en 30 jours</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Breakdown */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="card p-6">
+                                            <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                                <PieChartIcon size={18} className="text-gray-500" /> Répartition du Prix ({simulatorPlan.sellingPrice} DH)
+                                            </h4>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500"></span> Coût Produit</span>
+                                                    <span className="font-medium text-gray-700">{simulatorPlan.breakdown.cost} DH</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-purple-500"></span> Publicité (Ads)</span>
+                                                    <span className="font-medium text-gray-700">{simulatorPlan.targetCPA} DH</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500"></span> Livraison & Pack</span>
+                                                    <span className="font-medium text-gray-700">{simulatorPlan.breakdown.delivery + simulatorPlan.breakdown.pack} DH</span>
+                                                </div>
+                                                <div className="h-px bg-gray-100 my-2"></div>
+                                                <div className="flex justify-between items-center font-bold text-green-600 bg-green-50 p-2 rounded-lg">
+                                                    <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500"></span> Marge Nette</span>
+                                                    <span>+{simulatorPlan.breakdown.margin} DH</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="card p-6">
+                                            <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                                <Wallet size={18} className="text-gray-500" /> Budgets Prévisionnels
+                                            </h4>
+                                            <div className="space-y-4">
+                                                <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
+                                                    <p className="text-xs text-purple-600 font-bold uppercase mb-1">Budget Marketing Total</p>
+                                                    <p className="text-2xl font-bold text-purple-800">{Math.round(simulatorPlan.targetCPA * parseFloat(simulator.itemCount))} DH</p>
+                                                    <p className="text-xs text-purple-500 mt-1">À dépenser pour vendre tout le stock</p>
+                                                </div>
+                                                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                                    <p className="text-xs text-orange-600 font-bold uppercase mb-1">Budget Packaging</p>
+                                                    <p className="text-2xl font-bold text-orange-800">{Math.round(simulatorPlan.breakdown.pack * parseFloat(simulator.itemCount))} DH</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                                    <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                                        <TrendingUp size={32} className="text-indigo-300" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-1">En attente de données</h3>
+                                    <p className="text-sm text-gray-500 max-w-xs">Remplissez les paramètres de gauche pour générer votre plan de collection.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            )}
         </div>
     );
 };

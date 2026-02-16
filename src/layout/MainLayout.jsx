@@ -8,6 +8,8 @@ import { Toaster } from 'react-hot-toast';
 import useOrderPolling from '../hooks/useOrderPolling';
 import usePushNotifications from '../hooks/usePushNotifications';
 
+import Copilot from '../components/Copilot';
+
 const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
@@ -34,6 +36,7 @@ const MainLayout = () => {
           <Outlet />
         </main>
       </div>
+      <Copilot />
     </div>
   );
 };

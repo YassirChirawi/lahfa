@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import CreateOrderModal from '../components/CreateOrderModal';
-import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2, Link2Off, MapPin } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, RotateCcw, FileText, Truck, RefreshCw, MessageCircle, Eye, Link2, Link2Off, MapPin, Edit2, AlertTriangle, CheckCircle, ShieldAlert, ShieldCheck, Info } from 'lucide-react';
+import { evaluateOrderRisk } from '../services/aiService';
 import { generateInvoice } from '../utils/generateInvoice';
 import { getWhatsAppUrl } from '../utils/whatsappUtils';
 import olivraisonService from '../services/olivraisonService';
@@ -260,7 +262,7 @@ const Orders = () => {
             const updatedOrder = { ...order, status: newStatus };
             setWhatsappOrder(updatedOrder);
             setIsWhatsAppModalOpen(true);
-            toast.success(`Statut mis à jour. WhatsApp prêt.`);
+            toast.success(`Statut mis à jour.WhatsApp prêt.`);
         } else {
             toast.success("Statut mis à jour.");
         }
@@ -269,7 +271,7 @@ const Orders = () => {
     const handleSendToSendit = async (order) => {
         if (!await confirm({
             title: 'Confirmer l\'envoi',
-            message: `Envoyer la commande #${order.displayId || order.id} à Sendit ?`,
+            message: `Envoyer la commande #${order.displayId || order.id} à Sendit ? `,
             confirmText: 'Envoyer',
             variant: 'info'
         })) return;
@@ -290,14 +292,14 @@ const Orders = () => {
             toast.success("Commande envoyée à Sendit !", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur Sendit: ${error.message}`, { id: toastId });
+            toast.error(`Erreur Sendit: ${error.message} `, { id: toastId });
         }
     };
 
     const handleSendToDelivery = async (order) => {
         if (!await confirm({
             title: 'Confirmer l\'envoi',
-            message: `Envoyer la commande #${order.displayId || order.id} à Olivraison ?`,
+            message: `Envoyer la commande #${order.displayId || order.id} à Olivraison ? `,
             confirmText: 'Envoyer',
             variant: 'info'
         })) return;
@@ -317,7 +319,7 @@ const Orders = () => {
             toast.success("Commande envoyée à Olivraison !", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur Olivraison: ${error.message}`, { id: toastId });
+            toast.error(`Erreur Olivraison: ${error.message} `, { id: toastId });
         }
     };
 
@@ -366,7 +368,7 @@ const Orders = () => {
                     lastSync: new Date().toISOString()
                 },
             });
-            toast.success(`Statut: ${deliveryStatus}`, { id: toastId });
+            toast.success(`Statut: ${deliveryStatus} `, { id: toastId });
         } catch (error) {
             toast.error("Erreur de synchronisation", { id: toastId });
         }
@@ -389,7 +391,7 @@ const Orders = () => {
 
         if (!await confirm({
             title: 'Demande de ramassage',
-            message: `Confirmer la demande de ramassage pour ${senditOrders.length} colis Sendit ?`,
+            message: `Confirmer la demande de ramassage pour ${senditOrders.length} colis Sendit ? `,
             confirmText: 'Confirmer',
             variant: 'info'
         })) return;
@@ -434,7 +436,7 @@ const Orders = () => {
             toast.success("Demande de ramassage envoyée avec succès !", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur: ${error.message}`, { id: toastId });
+            toast.error(`Erreur: ${error.message} `, { id: toastId });
         }
     };
 
@@ -455,7 +457,7 @@ const Orders = () => {
 
         if (!await confirm({
             title: 'Demande de retour',
-            message: `Confirmer la demande de RETOUR pour ${senditOrders.length} colis Sendit ?`,
+            message: `Confirmer la demande de RETOUR pour ${senditOrders.length} colis Sendit ? `,
             confirmText: 'Confirmer',
             variant: 'warning'
         })) return;
@@ -501,7 +503,7 @@ const Orders = () => {
             toast.success("Demande de retour envoyée avec succès !", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur: ${error.message}`, { id: toastId });
+            toast.error(`Erreur: ${error.message} `, { id: toastId });
         }
     };
 
@@ -534,7 +536,7 @@ const Orders = () => {
             }
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur: ${error.message}`, { id: toastId });
+            toast.error(`Erreur: ${error.message} `, { id: toastId });
         }
     };
 
@@ -567,7 +569,7 @@ const Orders = () => {
                     );
 
                     if (localOrder) {
-                        console.log(`🔗 Auto-Link: Commande ${localOrder.displayId || localOrder.id} liée au Tracking ${trackingID}`);
+                        console.log(`🔗 Auto - Link: Commande ${localOrder.displayId || localOrder.id} liée au Tracking ${trackingID} `);
                         linkedCount++;
                     }
                 }
@@ -605,12 +607,12 @@ const Orders = () => {
             }
 
             let msg = `${updatedCount} commandes mises à jour.`;
-            if (linkedCount > 0) msg += ` ${linkedCount} nouvelles liaisons auto !`;
+            if (linkedCount > 0) msg += ` ${linkedCount} nouvelles liaisons auto!`;
 
             toast.success(msg, { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(`Erreur Sync: ${error.message}`, { id: toastId });
+            toast.error(`Erreur Sync: ${error.message} `, { id: toastId });
         }
     };
 
@@ -685,7 +687,7 @@ const Orders = () => {
     const handleUnlinkDelivery = async (order) => {
         if (!await confirm({
             title: 'Dissocier la commande',
-            message: `Voulez-vous vraiment retirer le code de suivi #${order.deliveryValues?.trackingID} de cette commande ?`,
+            message: `Voulez - vous vraiment retirer le code de suivi #${order.deliveryValues?.trackingID} de cette commande ? `,
             confirmText: 'Dissocier',
             variant: 'danger'
         })) return;
@@ -736,7 +738,7 @@ const Orders = () => {
                         </button>
                     )}
                     <button
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 border transition-colors ${showTrash ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                        className={`px - 4 py - 2 rounded - lg flex items - center gap - 2 border transition - colors ${showTrash ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'} `}
                         onClick={() => setShowTrash(!showTrash)}
                     >
                         <Trash2 size={18} />
@@ -765,14 +767,14 @@ const Orders = () => {
                 <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
                     <button
                         onClick={() => setWhatsappLang('fr')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${whatsappLang === 'fr' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px - 3 py - 1 text - xs font - medium rounded - md transition - colors ${whatsappLang === 'fr' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'} `}
                         title="Langue par défaut pour WhatsApp"
                     >
                         🇫🇷 FR
                     </button>
                     <button
                         onClick={() => setWhatsappLang('darija')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${whatsappLang === 'darija' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px - 3 py - 1 text - xs font - medium rounded - md transition - colors ${whatsappLang === 'darija' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'} `}
                         title="Langue par défaut pour WhatsApp"
                     >
                         🇲🇦 DAR
@@ -935,6 +937,38 @@ const Orders = () => {
                             <th>Qté</th>
                             <th>Prix (DH)</th>
                             <th>Statut</th>
+                            <th>
+                                <div className="flex items-center gap-1">
+                                    Risque AI 🛡️
+                                    <div className="group relative">
+                                        <Info size={14} className="text-gray-400 cursor-help hover:text-indigo-600 transition" />
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900 text-white text-xs p-3 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 pointer-events-none border border-indigo-500/30 backdrop-blur-sm">
+                                            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-indigo-900 rotate-45 border-l border-t border-indigo-500/30"></div>
+                                            <div className="font-bold border-b border-white/20 pb-2 mb-2 flex items-center gap-2 text-indigo-200">
+                                                <ShieldCheck size={14} />
+                                                Analyse de Risque IA
+                                            </div>
+                                            <p className="mb-3 opacity-90 leading-relaxed">
+                                                L'IA vérifie la cohérence des données (Adresse, Ville, Tél) pour prévenir les retours avant expédition.
+                                            </p>
+                                            <div className="space-y-1.5 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
+                                                    <span className="text-green-200">Faible: Commande sûre</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]"></span>
+                                                    <span className="text-orange-200">Moyen: À surveiller</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse"></span>
+                                                    <span className="text-red-200">Élevé: <strong className="text-white underline decoration-red-500/50">Appel Recommandé !</strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -953,7 +987,7 @@ const Orders = () => {
                                     <tr
                                         key={order.id}
                                         style={{ verticalAlign: 'top' }}
-                                        className={`transition-colors duration-500 ${highlightId === order.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''} ${selectedOrders.includes(order.id) ? 'bg-indigo-50/30' : ''}`}
+                                        className={`transition - colors duration - 500 ${highlightId === order.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''} ${selectedOrders.includes(order.id) ? 'bg-indigo-50/30' : ''} `}
                                     >
                                         <td className="w-10">
                                             <input
@@ -973,7 +1007,10 @@ const Orders = () => {
                                         {/* Multi-item Columns */}
                                         <td>
                                             {items.map((item, i) => (
-                                                <div key={i} style={{ marginBottom: '4px' }}>{item.article || '-'}</div>
+                                                <div key={i} style={{ marginBottom: '4px' }}>
+                                                    {item.ref && <span className="text-xs text-gray-400 font-mono mr-1">[{item.ref}]</span>}
+                                                    {item.article || '-'}
+                                                </div>
                                             ))}
                                         </td>
                                         <td>
@@ -994,9 +1031,36 @@ const Orders = () => {
 
                                         <td>{order.amount ? `${order.amount.toFixed(2)} DH` : '-'}</td>
                                         <td>
-                                            <span className={`status-badge ${getStatusColor(order.status)}`}>
+                                            <span className={`status - badge ${getStatusColor(order.status)} `}>
                                                 {order.status}
                                             </span>
+                                        </td>
+                                        <td>
+                                            {(() => {
+                                                const { level, reasons } = evaluateOrderRisk(order);
+                                                if (level === 'High') {
+                                                    return (
+                                                        <div className="group relative flex items-center text-red-600 font-bold text-xs" title={reasons.join(', ')}>
+                                                            <ShieldAlert size={16} className="mr-1" />
+                                                            Elevé
+                                                        </div>
+                                                    );
+                                                } else if (level === 'Medium') {
+                                                    return (
+                                                        <div className="group relative flex items-center text-orange-500 font-medium text-xs" title={reasons.join(', ')}>
+                                                            <AlertTriangle size={16} className="mr-1" />
+                                                            Moyen
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <div className="group relative flex items-center text-green-500 font-medium text-xs">
+                                                            <ShieldCheck size={16} className="mr-1" />
+                                                            OK
+                                                        </div>
+                                                    );
+                                                }
+                                            })()}
                                         </td>
                                         <td>
                                             <div className="actions-cell">
@@ -1075,9 +1139,9 @@ const Orders = () => {
                                                         ) : (
                                                             <>
                                                                 <button
-                                                                    className={`icon-btn-sm hover:bg-indigo-50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : (order.deliveryValues.provider === 'olivraison' ? 'text-green-600' : 'text-indigo-400')}`}
+                                                                    className={`icon - btn - sm hover: bg - indigo - 50 ${order.deliveryValues.provider === 'sendit' ? 'text-orange-600' : (order.deliveryValues.provider === 'olivraison' ? 'text-green-600' : 'text-indigo-400')} `}
                                                                     onClick={() => handleSyncStatus(order)}
-                                                                    title={`Sync avec ${order.deliveryValues.provider || (order.deliveryValues.trackingID?.startsWith('DH') ? 'sendit' : 'transporteur')}`}
+                                                                    title={`Sync avec ${order.deliveryValues.provider || (order.deliveryValues.trackingID?.startsWith('DH') ? 'sendit' : 'transporteur')} `}
                                                                 >
                                                                     <RefreshCw size={16} />
                                                                 </button>
@@ -1105,7 +1169,7 @@ const Orders = () => {
                                                             <button
                                                                 onClick={() => handleOpenWhatsApp(order)}
                                                                 className="icon-btn-sm text-green-600 hover:bg-green-50 ml-1"
-                                                                title={`Envoyer message WhatsApp (${order.status}) - ${whatsappLang.toUpperCase()}`}
+                                                                title={`Envoyer message WhatsApp(${order.status}) - ${whatsappLang.toUpperCase()} `}
                                                             >
                                                                 <MessageCircle size={16} />
                                                             </button>
@@ -1141,14 +1205,14 @@ const Orders = () => {
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`}
+                                className={`relative inline - flex items - center px - 4 py - 2 text - sm font - medium rounded - md ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'} `}
                             >
                                 Précédent
                             </button>
                             <button
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
-                                className={`relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium rounded-md ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`}
+                                className={`relative inline - flex items - center px - 4 py - 2 ml - 3 text - sm font - medium rounded - md ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'} `}
                             >
                                 Suivant
                             </button>
@@ -1164,7 +1228,7 @@ const Orders = () => {
                                     <button
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                         disabled={currentPage === 1}
-                                        className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        className={`relative inline - flex items - center px - 2 py - 2 rounded - l - md border border - gray - 300 bg - white text - sm font - medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'} `}
                                     >
                                         Précédent
                                     </button>
@@ -1172,7 +1236,7 @@ const Orders = () => {
                                         <button
                                             key={i + 1}
                                             onClick={() => setCurrentPage(i + 1)}
-                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1 ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+                                            className={`relative inline - flex items - center px - 4 py - 2 border text - sm font - medium ${currentPage === i + 1 ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'} `}
                                         >
                                             {i + 1}
                                         </button>
@@ -1180,7 +1244,7 @@ const Orders = () => {
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages}
-                                        className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        className={`relative inline - flex items - center px - 2 py - 2 rounded - r - md border border - gray - 300 bg - white text - sm font - medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'} `}
                                     >
                                         Suivant
                                     </button>

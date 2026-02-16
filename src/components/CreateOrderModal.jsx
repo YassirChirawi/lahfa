@@ -224,6 +224,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, onDelete, initialData = nul
         setCurrentItem(prev => ({
             ...prev,
             article: product.name,
+            ref: product.ref || '',
             productId: product.id, // STORE ID
             price: product.price || 0,
             size: '', // Reset size/color on new product
@@ -448,6 +449,7 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, onDelete, initialData = nul
                                                     onClick={() => !isOutOfStock && handleProductSelect(product)}
                                                 >
                                                     <div className="flex items-center gap-2">
+                                                        {product.ref && <span className="text-xs text-gray-400 font-mono">{product.ref}</span>}
                                                         <span className={isOutOfStock ? 'text-gray-500' : ''}>{product.name}</span>
                                                         {isOutOfStock && (
                                                             <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
@@ -528,7 +530,10 @@ const CreateOrderModal = ({ isOpen, onClose, onSave, onDelete, initialData = nul
                                 <tbody className="divide-y">
                                     {items.map((item, idx) => (
                                         <tr key={idx}>
-                                            <td className="px-3 py-2 font-medium">{item.article}</td>
+                                            <td className="px-3 py-2 font-medium">
+                                                {item.ref && <div className="text-[10px] text-gray-400 font-mono">{item.ref}</div>}
+                                                {item.article}
+                                            </td>
                                             <td className="px-3 py-2 text-gray-500">
                                                 {item.size && <span className="mr-2">T: {item.size}</span>}
                                                 {item.color && <span>C: {item.color}</span>}

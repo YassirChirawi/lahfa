@@ -506,6 +506,110 @@ const DeliverySettings = () => {
     );
 };
 
+// --- AI SETTINGS ---
+const AISettings = () => {
+    const { alert } = useConfirmation();
+    const [settings, setSettings] = useState({
+        apiKey: '',
+        provider: 'gemini', // 'gemini' or 'openai' (future)
+        model: 'gemini-1.5-flash',
+        active: true
+    });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        fetchSettings();
+    }, []);
+
+    const fetchSettings = async () => {
+        try {
+            const docRef = doc(db, 'settings', 'ai');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setSettings({ ...settings, ...docSnap.data() });
+            }
+        } catch (error) {
+            console.error("Error fetching AI settings:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await setDoc(doc(db, 'settings', 'ai'), settings);
+            await alert({ title: 'Succès', message: 'Configuration IA sauvegardée ! 🧠', variant: 'success' });
+        } catch (error) {
+            console.error("Error saving AI settings:", error);
+            await alert({ title: 'Erreur', message: 'Erreur sauvegarde.', variant: 'danger' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) return null;
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-purple-50 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-purple-700 flex items-center gap-2">
+                    <Box className="w-5 h-5" />
+                    Intelligence Artificielle (Cerveau)
+                </h2>
+                <span className="text-xs text-purple-500 bg-purple-100 px-2 py-1 rounded font-bold">Beta</span>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-6">
+                <div className="flex items-center gap-4 mb-4 bg-gray-50 p-4 rounded-lg">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                            checked={settings.active}
+                            onChange={e => setSettings({ ...settings, active: e.target.checked })}
+                        />
+                        <span className="font-bold text-gray-800">Activer l'IA</span>
+                    </label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Clé API (Gemini / OpenAI)</label>
+                        <input
+                            type="password"
+                            className="w-full px-4 py-2 rounded-lg border border-gray-300"
+                            value={settings.apiKey}
+                            onChange={e => setSettings({ ...settings, apiKey: e.target.value })}
+                            placeholder="sk-..."
+                        />
+                        <p className="text-xs text-gray-400 mt-1">
+                            Nécessaire pour le "Vrai Agent".
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline ml-1 font-medium">
+                                Obtenir ma clé ici (Google AI Studio) ↗
+                            </a>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        disabled={saving}
+                        icon={Save}
+                    >
+                        {saving ? 'Sauvegarde...' : 'Sauvegarder IA'}
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+// --- MAIN SETTINGS COMPONENT ---
 const Settings = () => {
     const { adjustStock, products } = useProducts();
     const { confirm, alert } = useConfirmation();
@@ -520,6 +624,7 @@ const Settings = () => {
             </div>
 
             <DeliverySettings />
+            <AISettings />
             <PromotionSettings />
         </div>
     );

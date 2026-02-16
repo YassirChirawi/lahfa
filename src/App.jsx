@@ -16,17 +16,17 @@ import Products from './pages/Products';
 import History from './pages/History';
 import Settings from './pages/Settings';
 import Pickups from './pages/Pickups';
-import Catalogue from './pages/Catalogue'; // Import Public Catalogue
-
+import SupportAI from './pages/SupportAI';
+import Catalogue from './pages/Catalogue';
 import { SecurityProvider, useSecurity } from './context/SecurityContext';
 import LockScreen from './components/LockScreen';
+import { CopilotProvider } from './context/CopilotContext';
 
 // Inner component to access SecurityContext and Location
 const AppContent = () => {
   const { isLocked } = useSecurity();
   const location = useLocation();
 
-  // Define public routes that don't require the lock screen
   const isPublicRoute = location.pathname.startsWith('/catalogue');
 
   return (
@@ -38,10 +38,7 @@ const AppContent = () => {
         transition: 'filter 0.3s'
       }}>
         <Routes>
-          {/* Public Route */}
           <Route path="/catalogue" element={<Catalogue />} />
-
-          {/* Protected Admin Routes */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="orders" element={<Orders />} />
@@ -49,9 +46,9 @@ const AppContent = () => {
             <Route path="clients" element={<Clients />} />
             <Route path="products" element={<Products />} />
             <Route path="history" element={<History />} />
+            <Route path="support-ai" element={<SupportAI />} />
             <Route path="settings" element={<Settings />} />
             <Route path="pickups" element={<Pickups />} />
-            {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -71,7 +68,9 @@ function App() {
                 <CollectionProvider>
                   <OrderProvider>
                     <ExpenseProvider>
-                      <AppContent />
+                      <CopilotProvider>
+                        <AppContent />
+                      </CopilotProvider>
                     </ExpenseProvider>
                   </OrderProvider>
                 </CollectionProvider>
