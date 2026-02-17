@@ -33,7 +33,8 @@ export const ProductProvider = ({ children }) => {
                 ...productData,
                 createdAt: new Date().toISOString(),
                 stock: parseInt(productData.stock) || 0,
-                price: parseFloat(productData.price) || 0
+                price: parseFloat(productData.price) || 0,
+                costPrice: parseFloat(productData.costPrice) || 0
             });
         } catch (e) {
             console.error("Error adding product: ", e);

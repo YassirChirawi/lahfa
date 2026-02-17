@@ -44,20 +44,25 @@ const SupportAI = () => {
         // Simulate Network Delay
         setTimeout(async () => {
             try {
-                const response = await autoBotService.handleIncomingMessage(testPhone, userMsg.text);
+                // UNIFICATION: Use Mervat AI Service instead of autoBotService
+                // Context for Support: "Support Client WhatsApp via Dashboard Simulator"
+                const responseText = await import('../services/aiService').then(mod =>
+                    mod.generateCopilotResponse(userMsg.text, "Support Client WhatsApp (Simulateur)", "Non spécifié")
+                );
 
                 const botMsg = {
                     id: Date.now() + 1,
-                    text: response.reply,
+                    text: responseText,
                     sender: 'bot',
                     time: new Date(),
-                    intent: response.intent,
-                    orderRef: response.order?.ref || response.order?.id
+                    intent: 'SUPPORT_AI', // Generic intent for now, or parse if needed
+                    orderRef: null
                 };
 
                 setMessages(prev => [...prev, botMsg]);
             } catch (error) {
-                setMessages(prev => [...prev, { id: Date.now() + 1, text: "Erreur lors du traitement.", sender: 'bot', time: new Date() }]);
+                console.error("Support AI Error:", error);
+                setMessages(prev => [...prev, { id: Date.now() + 1, text: "Désolée, je suis un peu débordée... 💖", sender: 'bot', time: new Date() }]);
             } finally {
                 setIsThinking(false);
             }

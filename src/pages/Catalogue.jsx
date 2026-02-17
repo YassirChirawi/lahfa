@@ -29,7 +29,12 @@ const Catalogue = () => {
 
     // Persist Cart
     useEffect(() => {
-        localStorage.setItem('lahfa_cart', JSON.stringify(cart));
+        try {
+            localStorage.setItem('lahfa_cart', JSON.stringify(cart));
+        } catch (e) {
+            // Ignore storage errors in restrictive environments
+            console.warn("Storage Check: LocalStorage not available");
+        }
     }, [cart]);
 
     const addToCart = (product) => {
@@ -119,21 +124,31 @@ const Catalogue = () => {
 
     const handleInstagram = (product) => {
         const refText = `Produit: ${product.name} - ${product.price}DH`;
-        navigator.clipboard.writeText(refText).then(() => {
-            toast.success("Référence copiée ! Envoyez-la sur Insta 📸", {
-                duration: 4000,
-                position: 'top-center',
-                style: {
-                    background: '#FDF2F8',
-                    color: '#DB2777',
-                    border: '1px solid #FBCFE8',
-                    borderRadius: '16px'
-                }
-            });
-            setTimeout(() => {
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(refText).then(() => {
+                toast.success("Référence copiée ! Envoyez-la sur Insta 📸", {
+                    duration: 4000,
+                    position: 'top-center',
+                    style: {
+                        background: '#FDF2F8',
+                        color: '#DB2777',
+                        border: '1px solid #FBCFE8',
+                        borderRadius: '16px'
+                    }
+                });
+                setTimeout(() => {
+                    window.open("https://www.instagram.com/lahfa_intimate/", "_blank");
+                }, 1000);
+            }).catch(err => {
+                console.error("Clipboard Error:", err);
+                // Fallback: just open instagram
                 window.open("https://www.instagram.com/lahfa_intimate/", "_blank");
-            }, 1000);
-        });
+            });
+        } else {
+            // Fallback for browsers without clipboard support
+            window.open("https://www.instagram.com/lahfa_intimate/", "_blank");
+        }
     };
 
     return (

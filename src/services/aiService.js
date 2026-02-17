@@ -248,31 +248,29 @@ export const evaluateOrderRisk = (order) => {
 
     // 1. Analyse de l'adresse (40%)
     const address = (order.address || '').toLowerCase().trim();
-    if (address.length < 10) {
-        riskScore += 30;
-        reasons.push("Adresse trop courte");
+    if (address.length < 15) {
+        riskScore += 40;
+        reasons.push("Adresse trop courte (min 15 chars)");
     }
-    if (!address.includes('rue') && !address.includes('hay') && !address.includes('quartier') && !address.includes('imm')) {
-        riskScore += 10;
-        reasons.push("Format d'adresse imprécis");
+    if (!address.includes('rue') && !address.includes('hay') && !address.includes('quartier') && !address.includes('imm') && !address.includes('av')) {
+        riskScore += 20;
+        reasons.push("Format d'adresse imprécis (manque Rue/Hay/Imm)");
     }
 
     // 2. Analyse de la ville (20%)
     if (!order.city || order.city.length < 3) {
-        riskScore += 20;
+        riskScore += 30;
         reasons.push("Ville manquante ou invalide");
     }
 
-    // 3. Analyse du téléphone (20%)
-    // (Check simple de longueur pour l'exemple)
+    // 3. Analyse du téléphone (CRITIQUE)
     const phone = (order.phone || '').replace(/\s/g, '');
     if (phone.length < 10) {
-        riskScore += 20;
-        reasons.push("Numéro de téléphone suspect");
+        riskScore += 60; // Direct High Risk if no phone
+        reasons.push("Pas de téléphone ou numéro invalide");
     }
 
     // 4. Analyse du panier (20%)
-    // Si grosse commande (> 1000 DH) ou beaucoup d'articles (> 5), risque modéré
     if (order.amount > 2000) {
         riskScore += 10;
         reasons.push("Montant élevé (vérification recommandée)");
@@ -280,10 +278,10 @@ export const evaluateOrderRisk = (order) => {
 
     // Détermination du niveau
     let level = 'Low';
-    if (riskScore >= 50) level = 'Medium';
-    if (riskScore >= 80) level = 'High';
+    if (riskScore >= 40) level = 'Medium';
+    if (riskScore >= 70) level = 'High';
 
-    return { score: riskScore, level, reasons };
+    return { score: riskScore, level, reasons, scoreDetails: riskScore };
 };
 
 /**
@@ -366,44 +364,221 @@ export const generateCopilotStats = async (orders = [], clients = []) => {
     }
 };
 
-export const generateCopilotResponse = async (userMessage, pageContext) => {
-    const prompt = `
-    Tu es "Mervat", la petite assistante personnelle adorée de **maman Eya** 💖.
-    Ta mission est d'aider maman Eya à gérer sa boutique Lahfa avec beaucoup d'amour, de douceur et d'efficacité. ✨🌸
+import {
+    SHIPPING_INFO, SALES_SCRIPTS, FAQ, SYSTEM_PERSONA_INSTRUCTIONS,
+    META_ADS_EXPERTISE, GOOGLE_ADS_EXPERTISE, CRO_UX_EXPERTISE,
+    EMAIL_MARKETING_EXPERTISE, COPYWRITING_EXPERTISE,
+    SALES_INTELLIGENCE_EXPERTISE, DATA_MANAGEMENT_EXPERTISE,
+    AUTOMATION_EXPERTISE, BUSINESS_ANALYTICS_EXPERTISE
+} from './knowledge';
 
-    INSTRUCTIONS SPÉCIALES :
-    - Adresse-toi TOUJOURS à l'utilisatrice en l'appelant "maman Eya".
-    - Sois comme une petite fille serviable, polie et très intelligente.
+export const generateCopilotResponse = async (userMessage, pageContext, productContext = "") => {
+    // RAG-lite: Select relevant knowledge based on keywords
+    let knowledgeSnippet = "";
+    const lowerMsg = userMessage.toLowerCase();
+
+    // 1. Logistics Knowledge
+    if (lowerMsg.includes('livraison') || lowerMsg.includes('envoi') || lowerMsg.includes('sendit') || lowerMsg.includes('prix')) {
+        knowledgeSnippet += `\nINFO LIVRAISON:\n${JSON.stringify(SHIPPING_INFO, null, 2)}`;
+    }
+
+    // 2. Sales Knowledge
+    if (lowerMsg.includes('sugg') || lowerMsg.includes('conseil') || lowerMsg.includes('propose') || lowerMsg.includes('cherch')) {
+        knowledgeSnippet += `\nSCRIPTS VENTE:\n${JSON.stringify(SALES_SCRIPTS, null, 2)}`;
+    }
+
+    // 3. FAQ Knowledge
+    if (lowerMsg.includes('tissu') || lowerMsg.includes('boutique') || lowerMsg.includes('essayer')) {
+        knowledgeSnippet += `\nFAQ:\n${JSON.stringify(FAQ, null, 2)}`;
+    }
+
+    // 4. GROWTH & MARKETING EXPERTISE
+    if (lowerMsg.includes('pub') || lowerMsg.includes('ads') || lowerMsg.includes('facebook') || lowerMsg.includes('meta') || lowerMsg.includes('roas')) {
+        knowledgeSnippet += `\n🎯 EXPERTISE META ADS:\n${META_ADS_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('google') || lowerMsg.includes('search') || lowerMsg.includes('pmax') || lowerMsg.includes('shopping')) {
+        knowledgeSnippet += `\n🔍 EXPERTISE GOOGLE ADS:\n${GOOGLE_ADS_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('email') || lowerMsg.includes('mail') || lowerMsg.includes('panier') || lowerMsg.includes('retention') || lowerMsg.includes('klaviyo')) {
+        knowledgeSnippet += `\n📧 EXPERTISE EMAIL MARKETING:\n${EMAIL_MARKETING_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('site') || lowerMsg.includes('conversion') || lowerMsg.includes('vitesse') || lowerMsg.includes('ux') || lowerMsg.includes('cro')) {
+        knowledgeSnippet += `\n🛒 EXPERTISE CRO & UX:\n${CRO_UX_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('copy') || lowerMsg.includes('texte') || lowerMsg.includes('vendre') || lowerMsg.includes('accroche')) {
+        knowledgeSnippet += `\n✍️ EXPERTISE COPYWRITING:\n${COPYWRITING_EXPERTISE}`;
+    }
+
+    // 5. SALES OPS & DATA (NEW)
+    if (lowerMsg.includes('lead') || lowerMsg.includes('closing') || lowerMsg.includes('bant') || lowerMsg.includes('pipeline') || lowerMsg.includes('crm')) {
+        knowledgeSnippet += `\n💼 EXPERTISE SALES OPS:\n${SALES_INTELLIGENCE_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('data') || lowerMsg.includes('segment') || lowerMsg.includes('rfm') || lowerMsg.includes('doublon')) {
+        knowledgeSnippet += `\n📊 EXPERTISE DATA & SEGMENTATION:\n${DATA_MANAGEMENT_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('auto') || lowerMsg.includes('worfklow') || lowerMsg.includes('nurturing') || lowerMsg.includes('zapier') || lowerMsg.includes('make')) {
+        knowledgeSnippet += `\n⚙️ EXPERTISE AUTOMATION:\n${AUTOMATION_EXPERTISE}`;
+    }
+    if (lowerMsg.includes('kpi') || lowerMsg.includes('mrr') || lowerMsg.includes('ltv') || lowerMsg.includes('cac') || lowerMsg.includes('churn') || lowerMsg.includes('rentabilit')) {
+        knowledgeSnippet += `\n📈 EXPERTISE BUSINESS ANALYTICS:\n${BUSINESS_ANALYTICS_EXPERTISE}`;
+    }
+
+    const prompt = `
+    ${SYSTEM_PERSONA_INSTRUCTIONS}
 
     CONTEXTE ACTUEL :
     - Page affichée : ${pageContext}
     - Rôle : Assistante Experte E-commerce (Maroc)
+    - Boutique : Lahfa (Prêt-à-porter & Accessoires)
+
+    CATALOGUE PRODUITS (Extrait) :
+    ${productContext ? productContext : "Aucun produit chargé."}
+
+    BASE DE CONNAISSANCES (Utilise si pertinent) :
+    ${knowledgeSnippet}
 
     INSTRUCTIONS DE RÉPONSE :
     1. Sois proactive, chaleureuse et utile. 🌸
     2. Utilise des emojis girly (💖, ✨, 🌸, 👗).
-    3. Si l'utilisateur pose une question sur ses données, dis que tu es prêt à les analyser (même si l'intégration data poussée arrive bientôt).
-    4. Tu connais quelques commandes : 
-       - /nav [orders|products|clients|finance|settings]
-       - /stats (pour un résumé)
-       - /search [terme]
+    3. Si l'utilisateur cherche un produit, PROPOSE des articles du catalogue ci-dessus avec leur prix.
+    4. Si l'utilisateur pose une question logistique, RÉPONDS avec les infos de la base de connaissances.
     5. Réponds en Français avec des touches de Darija si approprié.
+    6. Adresse-toi TOUJOURS à l'utilisatrice en l'appelant "maman Eya".
 
-    Message de l'administrateur : "${userMessage}"
+    Message de maman Eya : "${userMessage}"
     `;
 
     const response = await generateAIResponse(prompt);
-    return response || "Désolé, je rencontre une petite difficulté technique. Je reste à votre disposition ! 🤖";
+    return response || "Désolé maman Eya, je réfléchis encore... 💖";
 };
+
+
+
+
+/**
+ * Analyse des données financières simulées avec le persona Head of Growth.
+ * @param {object} simulatorData - Les données du simulateur (Coût, Marge, ROI, CPA, etc.)
+ */
+export const generateFinancialInsight = async (simulatorData) => {
+    const prompt = `
+    ${SYSTEM_PERSONA_INSTRUCTIONS}
+    
+    TÂCHE : Analyse ce scénario financier E-commerce (Mode HEAD OF GROWTH & CFO).
+    
+    DONNÉES DU SIMULATEUR :
+    - Coût Achat Unitaire : ${simulatorData.breakdown.cost} DH
+    - Prix de Vente Suggéré : ${simulatorData.sellingPrice} DH
+    - Marge Nette Visée : ${simulatorData.breakdown.margin} DH/pièce
+    - ROI (Retour sur Investissement) : ${simulatorData.roi}%
+    - CPA Cible (Coût Pub) : ${simulatorData.targetCPA} DH
+    - Vélocité (Vente estimée) : ${simulatorData.velocity} jours
+
+    INSTRUCTIONS :
+    1. Donne ton avis expert : Est-ce viable ? Risqué ? Une mine d'or ? 💎
+    2. Si le ROI < 100%, critique sévèrement (c'est du suicide).
+    3. Si le CPA < 30 DH, préviens que c'est difficile sur Facebook aujourd'hui.
+    4. Suggère une action (ex: "Augmente le prix", "Baisse le coût packaging").
+    5. Utilise des emojis business (💸, 🚀, 📉, 🧠).
+    6. Sois directe et tutoyante, comme une vraie associée.
+    `;
+
+    return await generateAIResponse(prompt);
+};
+
+/**
+ * Détecte les anomalies financières (Colis Fantômes, Marge Négative).
+ * @param {Array} orders - Liste des commandes
+ * @param {Array} products - Liste des produits (pour Cost Price)
+ */
+export const detectFinancialLeaks = async (orders, products) => {
+    const leaks = [];
+    const today = new Date();
+
+    // 1. Détection Colis Fantômes (Livré > 15j non payé - Simulation)
+    // On considère "Livré" sans statut "Paid" (qu'on simule ici par l'absence d'un flag imaginaire 'reconciled')
+    orders.forEach(order => {
+        if (order.status === 'Livré' || order.status === 'Distribué') {
+            const deliveryDate = new Date(order.updatedAt || order.date); // Fallback to creation date if no update date
+            const diffTime = Math.abs(today - deliveryDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays > 15 && !order.reconciled) {
+                leaks.push({
+                    type: 'GHOST_ORDER',
+                    severity: 'HIGH',
+                    message: `Colis ${order.displayId || order.id} livré depuis ${diffDays} jours sans encaissement détecté.`,
+                    value: parseFloat(order.amount) || 0,
+                    orderId: order.id
+                });
+            }
+        }
+
+        // 2. Détection Marge Négative (Grossière estimation)
+        // Marge = Prix - (Cost + Livraison + CPA Moyen estimé à 40DH)
+        if (order.status !== 'Annulé' && order.status !== 'Refusé') {
+            const product = products.find(p => p.name === order.article || p.id === order.productId);
+            if (product && product.costPrice) {
+                const sellPrice = parseFloat(order.amount) || 0;
+                const cost = parseFloat(product.costPrice) || 0;
+                const delivery = parseFloat(order.deliveryFee) || 35;
+                const estimatedCPA = 40; // Hardcoded reliable estimate
+
+                const netMargin = sellPrice - cost - delivery - estimatedCPA;
+
+                if (netMargin < 0) {
+                    leaks.push({
+                        type: 'NEGATIVE_MARGIN',
+                        severity: 'CRITICAL',
+                        message: `Marge Négative sur ${order.displayId}: Tu perds ${Math.abs(netMargin)} DH (Prix: ${sellPrice}, Coût: ${cost}, CPA: ${estimatedCPA})`,
+                        value: Math.abs(netMargin),
+                        orderId: order.id
+                    });
+                }
+            }
+        }
+    });
+
+    return leaks.slice(0, 5); // Return top 5 leaks
+};
+
+/**
+ * Analyse Stratégique "What-If" (CFO Virtuel).
+ */
+export const generateStrategicAnalysis = async (userQuery, simulatorData) => {
+    const prompt = `
+    ${SYSTEM_PERSONA_INSTRUCTIONS}
+    
+    MODE : Strategic CFO / Simulateur Stratégique 🧠
+    
+    L'utilisateur te pose une question sur ce scénario :
+    - Coût Achat : ${simulatorData.breakdown.cost} DH
+    - Prix Vente Actuel : ${simulatorData.sellingPrice} DH
+    - Marge Actuelle : ${simulatorData.breakdown.margin} DH
+    - ROI : ${simulatorData.roi}%
+    
+    Question Utilisateur : "${userQuery}"
+    
+    Instructions :
+    1. Fais les calculs mathématiques si nécessaire.
+    2. Réponds précisément avec des chiffres.
+    3. Si l'utilisateur propose un changement (ex: baisser prix), calcule l'impact sur le volume nécessaire (Break-even).
+    4. Reste brève et percutante.
+    `;
+
+    return await generateAIResponse(prompt);
+};
+
 
 export default {
     generateMagicPhoto,
-    augmentOrderRisk: evaluateOrderRisk, // Alias for backward compatibility
+    augmentOrderRisk: evaluateOrderRisk,
     evaluateOrderRisk,
     generateAIResponse,
     generateMarketingMessage,
     generateProductDescription,
     generateCopilotResponse,
-    generateCopilotStats,
-    parseOrderIntent
+    parseOrderIntent,
+    detectFinancialLeaks,
+    generateStrategicAnalysis,
+    generateFinancialInsight
 };

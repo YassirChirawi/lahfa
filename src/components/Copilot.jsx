@@ -36,11 +36,11 @@ const Copilot = () => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsOpen(!isOpen)}
-                className={`fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl flex items-center justify-center transition-colors ${isOpen ? 'bg-rose-500 text-white' : 'bg-rose-400 text-white'
+                className={`fixed sm:bottom-6 bottom-4 sm:right-6 right-4 z-50 p-3 sm:p-4 rounded-full shadow-2xl flex items-center justify-center transition-colors ${isOpen ? 'bg-rose-500 text-white' : 'bg-rose-400 text-white'
                     }`}
             >
                 {isOpen ? <X size={24} /> : (
-                    <img src={mervatAvatar} alt="Mervat" className="w-12 h-12 rounded-full border-2 border-white/50 shadow-inner object-cover" />
+                    <img src={mervatAvatar} alt="Mervat" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white/50 shadow-inner object-cover" />
                 )}
                 {!isOpen && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -54,10 +54,10 @@ const Copilot = () => {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ opacity: 0, x: 100, scale: 0.95 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: 100, scale: 0.95 }}
-                        className="fixed bottom-24 right-6 z-50 w-[380px] h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
+                        initial={{ opacity: 0, y: 100, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 100, scale: 0.95 }}
+                        className="fixed sm:bottom-24 bottom-0 sm:right-6 right-0 z-50 w-full sm:w-[380px] h-full sm:h-[600px] bg-white sm:rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
                     >
                         {/* HEADER */}
                         <div className="bg-rose-400 p-4 text-white flex items-center justify-between">
@@ -127,21 +127,21 @@ const Copilot = () => {
                         </div>
 
                         {/* INPUT */}
-                        <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-100">
+                        <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-100 pb-8 sm:pb-4">
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Posez une question ou tapez /..."
-                                    className="w-full pl-4 pr-10 py-3 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-rose-300 focus:bg-white transition-all"
+                                    placeholder="Posez une question maman Eya..."
+                                    className="w-full pl-4 pr-12 py-3.5 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-rose-300 focus:bg-white transition-all"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!input.trim()}
-                                    className="absolute right-2 top-1.5 p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30"
+                                    className="absolute right-2 top-2 p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg disabled:opacity-30"
                                 >
-                                    <Send size={18} />
+                                    <Send size={20} />
                                 </button>
                             </div>
                             <div className="mt-2 flex justify-between items-center text-[10px] text-gray-400 px-1">

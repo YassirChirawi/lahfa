@@ -331,6 +331,11 @@ const Products = () => {
                             </h3>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-indigo-600 font-bold">{parseFloat(product.price).toFixed(2)} DH</span>
+                                {product.costPrice > 0 && (
+                                    <span className="text-xs text-gray-400" title="Coût d'achat">
+                                        (Coût: {parseFloat(product.costPrice).toFixed(0)} DH)
+                                    </span>
+                                )}
                                 <span className={`text-xs px-2 py-1 rounded-full ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                     {product.stock} in stock
                                 </span>
@@ -390,6 +395,16 @@ const Products = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Price (DH)</label>
                                     <input required type="number" className="w-full p-2 border rounded-lg" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Coût d'Achat (DH)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-2 border border-red-200 bg-red-50 rounded-lg text-red-700 font-medium focus:ring-red-500"
+                                        placeholder="Ex: 50"
+                                        value={formData.costPrice || ''}
+                                        onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>

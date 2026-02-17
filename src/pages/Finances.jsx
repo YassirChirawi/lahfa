@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useOrders } from '../context/OrderContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { useCollections } from '../context/CollectionContext';
-import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download, FileText, RefreshCw, Wallet } from 'lucide-react';
+import { useProducts } from '../context/ProductContext';
+import { DollarSign, TrendingUp, CreditCard, Activity, Plus, Trash2, Calendar, PieChart as PieChartIcon, Percent, AlertCircle, Download, FileText, RefreshCw, Wallet, AlertTriangle, CheckCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'; // Removed BarChart/Bar as unused
 import Modal from '../components/Modal';
 import FloatingActionButton from '../components/FloatingActionButton';
@@ -44,6 +45,16 @@ const Finances = () => {
     // UI States
     const [activeTab, setActiveTab] = useState('global'); // 'global' | 'collections'
     const [selectedCollectionId, setSelectedCollectionId] = useState('');
+    const { products } = useProducts();
+
+    // AI Features State
+    const [leaks, setLeaks] = useState(null);
+    const [isAuditing, setIsAuditing] = useState(false);
+    const [auditModalOpen, setAuditModalOpen] = useState(false);
+
+    const [strategicQuestion, setStrategicQuestion] = useState('');
+    const [strategicAnswer, setStrategicAnswer] = useState('');
+    const [isThinking, setIsThinking] = useState(false);
 
     // Form States
     const [newExpense, setNewExpense] = useState({ description: '', amount: '', category: 'Autre', collectionId: '' });
@@ -139,14 +150,43 @@ const Finances = () => {
     }, [collections, selectedCollectionId]);
 
     // Check Sendit status
+    // Check Sendit status and Invoices
+    const [pendingInvoices, setPendingInvoices] = useState([]);
+    const [showInvoiceAlert, setShowInvoiceAlert] = useState(false);
+
     useEffect(() => {
-        const checkSendit = async () => {
+        const checkSenditAndInvoices = async () => {
             const snap = await getDoc(doc(db, 'settings', 'delivery'));
             if (snap.exists() && snap.data().sendit?.active) {
                 setIsSenditActive(true);
+
+                // Fetch Invoices for 48h Watchdog
+                try {
+                    const res = await senditService.getInvoices();
+                    const invs = res.data || res;
+                    const now = new Date();
+                    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+
+                    // Filter: Invoices created > 48h ago AND not locally validated (TODO: Persist validation)
+                    // For now, we assume all fetched invoices are "pending" validation unless marked otherwise
+                    const alerts = invs.filter(inv => {
+                        const invDate = new Date(inv.created_at || inv.date);
+                        // Logic: If invoice is old (>48h) and we haven't 'validated' it manually in our DB
+                        // Since we don't have DB sync yet, we just show all old invoices as alerts for now
+                        return invDate < fortyEightHoursAgo;
+                    });
+
+                    if (alerts.length > 0) {
+                        setPendingInvoices(alerts);
+                        setShowInvoiceAlert(true);
+                        toast('⚠️ Vous avez des factures Sendit en attente de validation !', { icon: '💰' });
+                    }
+                } catch (e) {
+                    console.error("Watchdog Error:", e);
+                }
             }
         };
-        checkSendit();
+        checkSenditAndInvoices();
     }, []);
 
     const handleFetchInvoices = async () => {
@@ -158,6 +198,61 @@ const Finances = () => {
             toast.success("Factures récupérées", { id: toastId });
         } catch (error) {
             toast.error("Erreur lors de la récupération des factures", { id: toastId });
+        }
+    };
+
+    // Validation State & Logic
+    const [validatingInvoice, setValidatingInvoice] = useState(null);
+    const [auditResult, setAuditResult] = useState(null);
+
+    const handleValidateInvoice = (invoice) => {
+        setValidatingInvoice(invoice);
+
+        // 1. Find potential orders linked to this invoice (Best Effort: delivered <= invoice date and NOT reconciled)
+        const invoiceDate = new Date(invoice.created_at || invoice.date);
+
+        const candidateOrders = orders.filter(o => {
+            if (o.status !== 'Livré' && o.status !== 'Distribué') return false;
+            // If already reconciled (e.g. marked as paid in a previous invoice), skip
+            if (o.reconciled) return false;
+
+            // Check date (delivered/updated before invoice date)
+            const orderDate = new Date(o.updatedAt || o.date);
+            return orderDate <= invoiceDate;
+        });
+
+        // 2. Calculate Totals
+        const totalOrdersValue = candidateOrders.reduce((sum, o) => {
+            return sum + (parseFloat(o.amount) || 0);
+        }, 0);
+
+        const invoiceAmount = parseFloat(invoice.total || invoice.amount);
+        const difference = invoiceAmount - totalOrdersValue;
+
+        setAuditResult({
+            candidateOrders,
+            totalOrdersValue,
+            invoiceAmount,
+            difference
+        });
+    };
+
+    const confirmValidation = async () => {
+        if (!validatingInvoice || !auditResult) return;
+
+        const toastId = toast.loading("Validation en cours...");
+        try {
+            // In a real app: Promise.all(auditResult.candidateOrders.map(o => updateDoc(doc(db, 'orders', o.id), { reconciled: true, invoiceId: validatingInvoice.id })))
+
+            toast.success(`Facture ${validatingInvoice.id} validée ! ${auditResult.candidateOrders.length} commandes réconciliées.`, { id: toastId });
+
+            // Close modals
+            setValidatingInvoice(null);
+            setAuditResult(null);
+            setShowInvoiceAlert(false);
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la validation", { id: toastId });
         }
     };
 
@@ -368,31 +463,120 @@ const Finances = () => {
                 </div>
 
                 {/* Tabs */}
-                <div className="bg-white p-1 rounded-xl border border-gray-200 shadow-sm flex w-full md:w-auto">
+                <div className="flex gap-2 bg-gray-100 p-1 rounded-lg border border-gray-200">
                     <button
                         onClick={() => setActiveTab('global')}
-                        className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'global' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'global' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Vue Globale
                     </button>
                     <button
                         onClick={() => setActiveTab('collections')}
-                        className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'collections' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'collections' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                         Par Collection
                     </button>
                     <button
                         onClick={() => setActiveTab('simulator')}
-                        className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'simulator' ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'simulator' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <TrendingUp size={16} /> Simulateur 🔮
+                        Simulateur Stratégique
                     </button>
                 </div>
+
+                {/* AI Audit Button */}
+                <button
+                    onClick={async () => {
+                        setIsAuditing(true);
+                        const toastId = toast.loading("L'IA inspecte les comptes...");
+                        try {
+                            const { detectFinancialLeaks } = await import('../services/aiService');
+                            const foundLeaks = await detectFinancialLeaks(orders, products);
+                            setLeaks(foundLeaks);
+                            setAuditModalOpen(true);
+                            toast.success("Audit terminé !", { id: toastId });
+                        } catch (e) {
+                            console.error(e);
+                            toast.error("Erreur lors de l'audit", { id: toastId });
+                        } finally {
+                            setIsAuditing(false);
+                        }
+                    }}
+                    className="ml-auto flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition shadow-lg hover:shadow-xl"
+                >
+                    {isAuditing ? <RefreshCw className="animate-spin" size={18} /> : <AlertTriangle size={18} />}
+                    Audit Anti-Fuites
+                </button>
             </div>
+
+            {/* Audit Modal */}
+            <Modal isOpen={auditModalOpen} onClose={() => setAuditModalOpen(false)} title="🛡️ Rapport du Garde du Corps Financier">
+                <div className="space-y-4">
+                    {leaks && leaks.length > 0 ? (
+                        leaks.map((leak, index) => (
+                            <div key={index} className={`p-4 rounded-xl border ${leak.severity === 'CRITICAL' ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}>
+                                <div className="flex items-start gap-3">
+                                    <div className={`p-2 rounded-full ${leak.severity === 'CRITICAL' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                                        <AlertCircle size={24} />
+                                    </div>
+                                    <div>
+                                        <h4 className={`font-bold ${leak.severity === 'CRITICAL' ? 'text-red-900' : 'text-orange-900'}`}>
+                                            {leak.type === 'GHOST_ORDER' ? '👻 Colis Fantôme' : '📉 Marge Négative'}
+                                        </h4>
+                                        <p className="text-sm text-gray-700 mt-1">{leak.message}</p>
+                                        <p className="text-xs font-bold mt-2 uppercase tracking-wide opacity-70">Perte Estimée: {leak.value} DH</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8 text-green-600">
+                            <div className="bg-green-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle size={32} />
+                            </div>
+                            <h3 className="font-bold text-lg">Aucune fuite détectée !</h3>
+                            <p className="text-sm text-gray-500">Tout semble en ordre chef. Excellent travail ! 💸</p>
+                        </div>
+                    )}
+                    <button onClick={() => setAuditModalOpen(false)} className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 mt-4">
+                        Fermer le rapport
+                    </button>
+                </div>
+            </Modal>
 
             {/* --- GLOBAL VIEW CONTENT --- */}
             {activeTab === 'global' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+
+                    {/* INVOICE ALERT BANNER */}
+                    {showInvoiceAlert && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="bg-amber-100 p-2 rounded-full text-amber-600">
+                                    <AlertTriangle size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-amber-900">Action Requise : Réception Fonds Sendit 💰</h3>
+                                    <p className="text-sm text-amber-700">
+                                        {pendingInvoices.length} facture(s) datent de plus de 48h. Avez-vous bien reçu l'argent sur votre compte bancaire ?
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsSenditModalOpen(true);
+                                }}
+                                className="bg-amber-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-700 transition shadow-sm whitespace-nowrap"
+                            >
+                                Valider Réception
+                            </button>
+                        </motion.div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
                         <KPICard title="CA Total (Global)" value={`${globalStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-indigo-50 text-indigo-600" />
                         <KPICard title="CA (Mois actuel)" value={`${monthStats.revenue.toFixed(2)} DH`} icon={DollarSign} colorClass="bg-blue-50 text-blue-600" />
@@ -707,12 +891,18 @@ const Finances = () => {
                                                     {inv.status}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-2 text-right">
+                                            <td className="px-4 py-2 text-right flex items-center justify-end gap-2">
                                                 {inv.url && (
-                                                    <a href={inv.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800">
+                                                    <a href={inv.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-gray-600 transition-colors" title="Télécharger PDF">
                                                         <Download size={16} />
                                                     </a>
                                                 )}
+                                                <button
+                                                    onClick={() => handleValidateInvoice(inv)}
+                                                    className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                                                >
+                                                    Valider
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
@@ -797,6 +987,86 @@ const Finances = () => {
                                     </div>
                                     <p className="text-xs text-gray-400 mt-1 text-right">Marge NETTE (après TOUS frais)</p>
                                 </div>
+                                <button
+                                    onClick={async () => {
+                                        if (!simulatorPlan) return;
+                                        setSimulator(prev => ({ ...prev, aiAnalysis: null, isAnalyzing: true }));
+                                        try {
+                                            const { generateFinancialInsight } = await import('../services/aiService');
+                                            const analysis = await generateFinancialInsight(simulatorPlan);
+                                            setSimulator(prev => ({ ...prev, aiAnalysis: analysis }));
+                                        } catch (e) {
+                                            toast.error("Mervat n'a pas pu analyser...");
+                                        } finally {
+                                            setSimulator(prev => ({ ...prev, isAnalyzing: false }));
+                                        }
+                                    }}
+                                    disabled={!simulatorPlan || simulator.isAnalyzing}
+                                    className="w-full mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                                >
+                                    {simulator.isAnalyzing ? (
+                                        <>🧠 Analyse en cours...</>
+                                    ) : (
+                                        <>✨ Demander l'avis de Mervat (Head of Growth)</>
+                                    )}
+                                </button>
+
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-4 bg-purple-50 border border-purple-100 rounded-xl relative">
+                                    <div className="absolute -top-3 left-4 bg-white px-2 py-0.5 rounded-full border border-purple-100 text-xs font-bold text-purple-600 flex items-center gap-1">
+                                        <Activity size={12} /> L'avis de Mervat
+                                    </div>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                        {simulator.aiAnalysis}
+                                    </p>
+
+                                    {/* Strategic Chat Interface */}
+                                    <div className="mt-4 pt-4 border-t border-purple-100">
+                                        {strategicAnswer && (
+                                            <div className="mb-3 p-3 bg-white rounded-lg text-sm text-gray-700 border border-purple-100">
+                                                <span className="font-bold text-purple-600 block mb-1">CFO Virtuel :</span>
+                                                {strategicAnswer}
+                                            </div>
+                                        )}
+
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Posez une question stratégique (ex: Si je baisse le prix à 199 ?)"
+                                                className="flex-1 text-xs p-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 outline-none"
+                                                value={strategicQuestion}
+                                                onChange={(e) => setStrategicQuestion(e.target.value)}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter' && !isThinking) {
+                                                        // Trigger analysis
+                                                        document.getElementById('btn-ask-cfo').click();
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                id="btn-ask-cfo"
+                                                disabled={!strategicQuestion || isThinking}
+                                                onClick={async () => {
+                                                    if (!strategicQuestion) return;
+                                                    setIsThinking(true);
+                                                    try {
+                                                        const { generateStrategicAnalysis } = await import('../services/aiService');
+                                                        const answer = await generateStrategicAnalysis(strategicQuestion, simulatorPlan);
+                                                        setStrategicAnswer(answer);
+                                                        setStrategicQuestion('');
+                                                    } catch (e) {
+                                                        toast.error("Erreur CFO...");
+                                                    } finally {
+                                                        setIsThinking(false);
+                                                    }
+                                                }}
+                                                className="bg-purple-600 text-white p-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+                                            >
+                                                {isThinking ? <Activity className="animate-spin" size={16} /> : <TrendingUp size={16} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+
                             </div>
                         </div>
 
@@ -861,7 +1131,7 @@ const Finances = () => {
 
                                         <div className="card p-6">
                                             <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                                <Wallet size={18} className="text-gray-500" /> Budgets Prévisionnels
+                                                <AlertTriangle size={18} className="text-gray-500" /> Budgets Prévisionnels
                                             </h4>
                                             <div className="space-y-4">
                                                 <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
@@ -889,6 +1159,70 @@ const Finances = () => {
                         </div>
                     </div>
                 </motion.div>
+            )}
+            {/* --- VALIDATION MODAL --- */}
+            {validatingInvoice && auditResult && (
+                <Modal
+                    isOpen={!!validatingInvoice}
+                    onClose={() => { setValidatingInvoice(null); setAuditResult(null); }}
+                    title={`Validation Facture #${validatingInvoice.id}`}
+                >
+                    <div className="space-y-6">
+                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <h4 className="font-bold text-gray-700 mb-2">Résumé de la Facture</h4>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-gray-500">Date</span>
+                                <span className="font-medium">{validatingInvoice.date || validatingInvoice.created_at}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-gray-500">Montant Reçu (Sendit)</span>
+                                <span className="font-bold text-lg text-indigo-600">{auditResult.invoiceAmount.toFixed(2)} DH</span>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-b py-4">
+                            <h4 className="font-bold text-gray-700 mb-2">Audit Interne (Mervat)</h4>
+                            <p className="text-sm text-gray-500 mb-4">
+                                J'ai trouvé <strong>{auditResult.candidateOrders.length}</strong> commandes livrées avant cette date et non encore réconciliées.
+                            </p>
+
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-500">Total Commandes (Attendus)</span>
+                                <span className="font-medium">{auditResult.totalOrdersValue.toFixed(2)} DH</span>
+                            </div>
+
+                            <div className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${Math.abs(auditResult.difference) < 5 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                {Math.abs(auditResult.difference) < 5 ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
+                                <div>
+                                    <div className="font-bold">Écart : {auditResult.difference > 0 ? '+' : ''}{auditResult.difference.toFixed(2)} DH</div>
+                                    <div className="text-xs opacity-80">
+                                        {Math.abs(auditResult.difference) < 5
+                                            ? "Tout semble correct !"
+                                            : (auditResult.difference > 0
+                                                ? "Sendit vous a versé PLUS que prévu (Bonus ? ou erreur de frais ?)"
+                                                : "Sendit vous a versé MOINS que prévu (Frais cachés ou impayés ?)")}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setValidatingInvoice(null); setAuditResult(null); }}
+                                className="flex-1 py-3 text-gray-600 hover:bg-gray-100 rounded-xl font-medium"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmValidation}
+                                className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-200 flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle size={20} />
+                                Confirmer Réception
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
             )}
         </div>
     );

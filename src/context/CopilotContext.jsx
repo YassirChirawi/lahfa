@@ -5,12 +5,14 @@ import { doc, getDoc } from 'firebase/firestore';
 import aiService from '../services/aiService';
 import { useOrders } from './OrderContext';
 import { useClients } from './ClientContext';
+import { useProducts } from './ProductContext';
 
 const CopilotContext = createContext();
 
 export const CopilotProvider = ({ children }) => {
     const { orders, addOrder } = useOrders();
     const { clients } = useClients();
+    const { products } = useProducts();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
         { id: 1, role: 'assistant', content: "Bonjour maman Eya ! 💖 Je suis Mervat, votre petite assistante. Comment puis-je vous aider aujourd'hui ? ✨🌸" }
@@ -115,7 +117,8 @@ export const CopilotProvider = ({ children }) => {
             }
 
             // Normal AI Call
-            const response = await aiService.generateCopilotResponse(content, getPageContext());
+            const productContext = products.map(p => `${p.name} (${p.price} DH) - Stock: ${p.stock}`).join('\n');
+            const response = await aiService.generateCopilotResponse(content, getPageContext(), productContext);
 
             // Detect Order Intent
             const orderIntent = await aiService.parseOrderIntent(content);
